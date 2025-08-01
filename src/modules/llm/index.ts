@@ -196,8 +196,20 @@ export class LLMGateway {
         );
       }
 
-      const data = await response.json();
-      const embeddings = data.data.map((item: any) => item.embedding);
+      const data = (await response.json()) as {
+        data: Array<{
+          embedding: number[];
+          index: number;
+          object: string;
+        }>;
+        model: string;
+        object: string;
+        usage: {
+          prompt_tokens: number;
+          total_tokens: number;
+        };
+      };
+      const embeddings = data.data.map((item) => item.embedding);
 
       return {
         success: true,
@@ -255,8 +267,30 @@ export class LLMGateway {
         throw new Error(`Failed to fetch models: ${response.status}`);
       }
 
-      const data = await response.json();
-      const models = data.data?.map((model: any) => model.id) || [];
+      const data = (await response.json()) as {
+        data: Array<{
+          id: string;
+          object: string;
+          created: number;
+          owned_by: string;
+          permission?: Array<{
+            id: string;
+            object: string;
+            created: number;
+            allow_create_engine: boolean;
+            allow_sampling: boolean;
+            allow_logprobs: boolean;
+            allow_search_indices: boolean;
+            allow_view: boolean;
+            allow_fine_tuning: boolean;
+            organization: string;
+            group?: string;
+            is_blocking: boolean;
+          }>;
+        }>;
+        object: string;
+      };
+      const models = data.data?.map((model) => model.id) || [];
 
       return {
         success: true,
@@ -446,5 +480,3 @@ export class ChatService {
 // Export singleton instances
 export const llmGateway = new LLMGateway();
 export const chatService = new ChatService();
-
-export { LLMGateway as default, ChatService };

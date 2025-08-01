@@ -1,7 +1,5 @@
-// Next.js API route for NextAuth.js
-import NextAuth from 'next-auth';
-import { authOptions } from '@/modules/auth';
+// Next.js API route for NextAuth.js v5
+import { handlers } from '@/modules/auth';
 
-const handler = NextAuth(authOptions);
-
-export { handler as GET, handler as POST };
+// Export the pre-configured handlers from NextAuth.js v5
+export const { GET, POST } = handlers;

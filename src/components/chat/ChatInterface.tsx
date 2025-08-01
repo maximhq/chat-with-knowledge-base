@@ -1,33 +1,43 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import type { Message, Thread } from '@/types';
+import React, { useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Send, Bot, User, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  useThreadStore,
+  useMessageStore,
+  useThreadMessages,
+  useIsStreamingForThread,
+} from "@/stores";
 
 interface ChatInterfaceProps {
   threadId: string | null;
   onThreadSelect: (threadId: string) => void;
 }
 
-export function ChatInterface({ threadId, onThreadSelect }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
+export function ChatInterface({
+  threadId,
+  onThreadSelect,
+}: ChatInterfaceProps) {
+  const messages = useThreadMessages(threadId);
+  const isStreaming = useIsStreamingForThread(threadId);
+  const createThread = useThreadStore((state) => state.createThread);
+  const sendMessage = useMessageStore((state) => state.sendMessage);
+  const fetchMessages = useMessageStore((state) => state.fetchMessages);
+  const isLoading = useMessageStore((state) => state.isLoading);
+
+  const [inputValue, setInputValue] = React.useState("");
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (threadId) {
-      fetchMessages();
-    } else {
-      setMessages([]);
+      fetchMessages(threadId);
     }
-  }, [threadId]);
+  }, [threadId, fetchMessages]);
 
   useEffect(() => {
     // Auto-scroll to bottom when new messages arrive
@@ -36,152 +46,42 @@ export function ChatInterface({ threadId, onThreadSelect }: ChatInterfaceProps) 
     }
   }, [messages]);
 
-  const fetchMessages = async () => {
-    if (!threadId) return;
-
-    try {
-      const response = await fetch(`/api/threads/${threadId}/messages`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setMessages(data.data);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      toast.error('Failed to load messages');
+  const handleNewThread = async () => {
+    const newThread = await createThread("New Chat");
+    if (newThread) {
+      onThreadSelect(newThread.id);
+      // Focus on the textarea after creating new thread
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
     }
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isLoading) return;
+    if (!inputValue.trim() || isLoading || isStreaming) return;
 
     const messageContent = inputValue.trim();
-    setInputValue('');
-    setIsLoading(true);
+    setInputValue("");
 
-    try {
-      // If no thread is selected, create a new one
-      let currentThreadId = threadId;
-      if (!currentThreadId) {
-        const threadResponse = await fetch('/api/threads', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: 'New Chat' }),
-        });
-
-        if (threadResponse.ok) {
-          const threadData = await threadResponse.json();
-          if (threadData.success) {
-            currentThreadId = threadData.data.id;
-            onThreadSelect(currentThreadId);
-          }
-        }
+    // If no thread is selected, create a new one
+    let currentThreadId = threadId;
+    if (!currentThreadId) {
+      const newThread = await createThread("New Chat");
+      if (newThread) {
+        currentThreadId = newThread.id;
+        onThreadSelect(currentThreadId);
+      } else {
+        toast.error("Failed to create new chat");
+        return;
       }
-
-      if (!currentThreadId) {
-        throw new Error('Failed to create or select thread');
-      }
-
-      // Add user message
-      const userMessage: Message = {
-        id: `temp-${Date.now()}`,
-        threadId: currentThreadId,
-        content: messageContent,
-        role: 'USER',
-        createdAt: new Date()
-      };
-
-      setMessages(prev => [...prev, userMessage]);
-
-      // Send message to API
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageContent,
-          threadId: currentThreadId,
-          stream: true
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      // Handle streaming response
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('No response body reader');
-      }
-
-      setIsStreaming(true);
-      const assistantMessage: Message = {
-        id: `temp-assistant-${Date.now()}`,
-        threadId: currentThreadId,
-        content: '',
-        role: 'ASSISTANT',
-        createdAt: new Date()
-      };
-
-      setMessages(prev => [...prev, assistantMessage]);
-
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || '';
-
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              
-              if (data === '[DONE]') {
-                setIsStreaming(false);
-                return;
-              }
-
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.content) {
-                  setMessages(prev => 
-                    prev.map(msg => 
-                      msg.id === assistantMessage.id
-                        ? { ...msg, content: msg.content + parsed.content }
-                        : msg
-                    )
-                  );
-                }
-              } catch (parseError) {
-                console.warn('Failed to parse streaming chunk:', parseError);
-              }
-            }
-          }
-        }
-      } finally {
-        reader.releaseLock();
-        setIsStreaming(false);
-      }
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast.error('Failed to send message');
-      // Remove the temporary user message on error
-      setMessages(prev => prev.filter(msg => msg.id !== `temp-${Date.now()}`));
-    } finally {
-      setIsLoading(false);
     }
+
+    // Send message using store
+    await sendMessage(currentThreadId, messageContent);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -190,10 +90,13 @@ export function ChatInterface({ threadId, onThreadSelect }: ChatInterfaceProps) 
   const formatMessageContent = (content: string) => {
     // Basic markdown-like formatting
     return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`(.*?)`/g, '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm">$1</code>')
-      .replace(/\n/g, '<br>');
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(
+        /`(.*?)`/g,
+        '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm">$1</code>'
+      )
+      .replace(/\n/g, "<br>");
   };
 
   if (!threadId) {
@@ -205,11 +108,10 @@ export function ChatInterface({ threadId, onThreadSelect }: ChatInterfaceProps) 
             Welcome to your Knowledge Base Chat
           </h2>
           <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Start a new conversation or select an existing thread from the sidebar to begin chatting with your AI assistant.
+            Start a new conversation or select an existing thread from the
+            sidebar to begin chatting with your AI assistant.
           </p>
-          <Button onClick={() => handleSendMessage()} disabled>
-            Start New Chat
-          </Button>
+          <Button onClick={() => handleNewThread()}>Start New Chat</Button>
         </div>
       </div>
     );
@@ -232,36 +134,38 @@ export function ChatInterface({ threadId, onThreadSelect }: ChatInterfaceProps) 
               <div
                 key={message.id}
                 className={`flex items-start space-x-3 ${
-                  message.role === 'USER' ? 'justify-end' : 'justify-start'
+                  message.role === "USER" ? "justify-end" : "justify-start"
                 }`}
               >
-                {message.role === 'ASSISTANT' && (
+                {message.role === "ASSISTANT" && (
                   <div className="flex-shrink-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
                     <Bot className="h-4 w-4 text-white" />
                   </div>
                 )}
-                
+
                 <div
                   className={`max-w-3xl rounded-lg px-4 py-2 ${
-                    message.role === 'USER'
-                      ? 'bg-blue-500 text-white ml-12'
-                      : 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white mr-12'
+                    message.role === "USER"
+                      ? "bg-blue-500 text-white ml-12"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white mr-12"
                   }`}
                 >
                   <div
                     dangerouslySetInnerHTML={{
-                      __html: formatMessageContent(message.content)
+                      __html: formatMessageContent(message.content),
                     }}
                   />
-                  {message.role === 'ASSISTANT' && isStreaming && message.content === '' && (
-                    <div className="flex items-center space-x-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      <span className="text-sm">Thinking...</span>
-                    </div>
-                  )}
+                  {message.role === "ASSISTANT" &&
+                    isStreaming &&
+                    message.content === "" && (
+                      <div className="flex items-center space-x-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <span className="text-sm">Thinking...</span>
+                      </div>
+                    )}
                 </div>
 
-                {message.role === 'USER' && (
+                {message.role === "USER" && (
                   <div className="flex-shrink-0 w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center">
                     <User className="h-4 w-4 text-white" />
                   </div>
@@ -300,9 +204,6 @@ export function ChatInterface({ threadId, onThreadSelect }: ChatInterfaceProps) 
               </Button>
             </div>
           </div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-            Your messages are processed with context from your knowledge base
-          </p>
         </div>
       </div>
     </div>

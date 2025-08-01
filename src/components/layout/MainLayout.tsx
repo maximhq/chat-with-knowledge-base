@@ -1,11 +1,12 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { Sidebar } from './Sidebar';
-import { Workspace } from './Workspace';
-import { AuthGuard } from './AuthGuard';
-import { Toaster } from '@/components/ui/sonner';
+import React from "react";
+import { useSession } from "next-auth/react";
+import { Sidebar } from "./Sidebar";
+import { Workspace } from "./Workspace";
+import { AuthGuard } from "./AuthGuard";
+import { Toaster } from "@/components/ui/sonner";
+import { useThreadStore, useUIStore, useActiveTab } from "@/stores";
 
 interface MainLayoutProps {
   children?: React.ReactNode;
@@ -13,10 +14,12 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { data: session, status } = useSession();
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'messages' | 'knowledge-base'>('messages');
+  const selectedThreadId = useThreadStore((state) => state.selectedThreadId);
+  const selectThread = useThreadStore((state) => state.selectThread);
+  const activeTab = useActiveTab();
+  const setActiveTab = useUIStore((state) => state.setActiveTab);
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
@@ -31,10 +34,10 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <Sidebar
             selectedThreadId={selectedThreadId}
-            onThreadSelect={setSelectedThreadId}
+            onThreadSelect={selectThread}
             onNewThread={() => {
-              setSelectedThreadId(null);
-              setActiveTab('messages');
+              selectThread(null);
+              setActiveTab("messages");
             }}
           />
         </div>
@@ -48,26 +51,26 @@ export function MainLayout({ children }: MainLayoutProps) {
                 Chat with Knowledge Base
               </h1>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               {/* Tab Navigation */}
               <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                 <button
-                  onClick={() => setActiveTab('messages')}
+                  onClick={() => setActiveTab("messages")}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                    activeTab === 'messages'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    activeTab === "messages"
+                      ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
                   Messages
                 </button>
                 <button
-                  onClick={() => setActiveTab('knowledge-base')}
+                  onClick={() => setActiveTab("knowledge-base")}
                   className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                    activeTab === 'knowledge-base'
-                      ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
-                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    activeTab === "knowledge-base"
+                      ? "bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm"
+                      : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
                   }`}
                 >
                   Knowledge Base
@@ -78,7 +81,7 @@ export function MainLayout({ children }: MainLayoutProps) {
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {session?.user?.email?.[0]?.toUpperCase() || 'U'}
+                    {session?.user?.email?.[0]?.toUpperCase() || "U"}
                   </span>
                 </div>
               </div>
@@ -90,7 +93,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             <Workspace
               activeTab={activeTab}
               selectedThreadId={selectedThreadId}
-              onThreadSelect={setSelectedThreadId}
+              onThreadSelect={selectThread}
             />
           </div>
         </div>

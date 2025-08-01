@@ -119,10 +119,10 @@ enum FileStatus {
 
 // MCP Server (Multi-Context Provider)
 model DocumentChunk {
-  id         String @id @default(cuid())
+  id         String   @id @default(cuid())
   documentId String
-  content    String @db.Text
-  embedding  String @db.Text // JSON string of vector embeddings
+  content    String   @db.Text
+  embedding  String   @db.Text // JSON string of vector embeddings
   chunkIndex Int
   createdAt  DateTime @default(now())
 

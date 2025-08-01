@@ -1,0 +1,255 @@
+import { create } from 'zustand';
+import { devtools, subscribeWithSelector } from 'zustand/middleware';
+import { immer } from 'zustand/middleware/immer';
+import type { Message } from '@/types';
+import { MessageRole } from '@/types';
+
+interface MessageState {
+  // State - organized by threadId
+  messagesByThread: Record<string, Message[]>;
+  isLoading: boolean;
+  isStreaming: boolean;
+  streamingThreadId: string | null;
+  error: string | null;
+  
+  // Actions
+  setMessages: (threadId: string, messages: Message[]) => void;
+  addMessage: (threadId: string, message: Message) => void;
+  updateMessage: (threadId: string, messageId: string, updates: Partial<Message>) => void;
+  appendToMessage: (threadId: string, messageId: string, content: string) => void;
+  clearMessages: (threadId: string) => void;
+  setLoading: (loading: boolean) => void;
+  setStreaming: (streaming: boolean, threadId?: string) => void;
+  setError: (error: string | null) => void;
+  
+  // Async actions
+  fetchMessages: (threadId: string) => Promise<void>;
+  sendMessage: (threadId: string, content: string) => Promise<void>;
+}
+
+export const useMessageStore = create<MessageState>()(
+  devtools(
+    subscribeWithSelector(
+      immer((set) => ({
+        // Initial state
+        messagesByThread: {},
+        isLoading: false,
+        isStreaming: false,
+        streamingThreadId: null,
+        error: null,
+
+        // Synchronous actions
+        setMessages: (threadId, messages) =>
+          set((state) => {
+            state.messagesByThread[threadId] = messages;
+          }),
+
+        addMessage: (threadId, message) =>
+          set((state) => {
+            if (!state.messagesByThread[threadId]) {
+              state.messagesByThread[threadId] = [];
+            }
+            state.messagesByThread[threadId].push(message);
+          }),
+
+        updateMessage: (threadId, messageId, updates) =>
+          set((state) => {
+            const messages = state.messagesByThread[threadId];
+            if (messages) {
+              const index = messages.findIndex((m) => m.id === messageId);
+              if (index !== -1) {
+                Object.assign(messages[index], updates);
+              }
+            }
+          }),
+
+        appendToMessage: (threadId, messageId, content) =>
+          set((state) => {
+            const messages = state.messagesByThread[threadId];
+            if (messages) {
+              const message = messages.find((m) => m.id === messageId);
+              if (message) {
+                message.content += content;
+              }
+            }
+          }),
+
+        clearMessages: (threadId) =>
+          set((state) => {
+            delete state.messagesByThread[threadId];
+          }),
+
+        setLoading: (loading) =>
+          set((state) => {
+            state.isLoading = loading;
+          }),
+
+        setStreaming: (streaming, threadId) =>
+          set((state) => {
+            state.isStreaming = streaming;
+            state.streamingThreadId = streaming ? threadId || null : null;
+          }),
+
+        setError: (error) =>
+          set((state) => {
+            state.error = error;
+          }),
+
+        // Async actions
+        fetchMessages: async (threadId) => {
+          if (!threadId) return;
+
+          set((state) => {
+            state.isLoading = true;
+            state.error = null;
+          });
+
+          try {
+            const response = await fetch(`/api/threads/${threadId}/messages`);
+            if (response.ok) {
+              const data = await response.json();
+              if (data.success) {
+                set((state) => {
+                  state.messagesByThread[threadId] = data.data;
+                  state.isLoading = false;
+                });
+              } else {
+                throw new Error(data.error || 'Failed to fetch messages');
+              }
+            } else {
+              throw new Error('Failed to fetch messages');
+            }
+          } catch (error) {
+            set((state) => {
+              state.error = error instanceof Error ? error.message : 'Unknown error';
+              state.isLoading = false;
+            });
+          }
+        },
+
+        sendMessage: async (threadId, content) => {
+          if (!threadId || !content.trim()) return;
+
+          // Add user message immediately
+          const userMessage: Message = {
+            id: `temp-${Date.now()}`,
+            threadId,
+            content: content.trim(),
+            role: MessageRole.USER,
+            createdAt: new Date(),
+          };
+
+          set((state) => {
+            if (!state.messagesByThread[threadId]) {
+              state.messagesByThread[threadId] = [];
+            }
+            state.messagesByThread[threadId].push(userMessage);
+            state.isStreaming = true;
+            state.streamingThreadId = threadId;
+          });
+
+          try {
+            const response = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                message: content,
+                threadId,
+                stream: true,
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error('Failed to send message');
+            }
+
+            // Handle streaming response
+            const reader = response.body?.getReader();
+            if (!reader) {
+              throw new Error('No response body reader');
+            }
+
+            // Add assistant message placeholder
+            const assistantMessage: Message = {
+              id: `temp-assistant-${Date.now()}`,
+              threadId,
+              content: '',
+              role: MessageRole.ASSISTANT,
+              createdAt: new Date(),
+            };
+
+            set((state) => {
+              state.messagesByThread[threadId].push(assistantMessage);
+            });
+
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                  if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    if (data === '[DONE]') {
+                      set((state) => {
+                        state.isStreaming = false;
+                        state.streamingThreadId = null;
+                      });
+                      return;
+                    }
+
+                    try {
+                      const parsed = JSON.parse(data);
+                      if (parsed.content) {
+                        set((state) => {
+                          const messages = state.messagesByThread[threadId];
+                          const lastMessage = messages[messages.length - 1];
+                          if (lastMessage && lastMessage.role === MessageRole.ASSISTANT) {
+                            lastMessage.content += parsed.content;
+                          }
+                        });
+                      }
+                    } catch {
+                      // Ignore parsing errors for individual chunks
+                    }
+                  }
+                }
+              }
+            } finally {
+              reader.releaseLock();
+              set((state) => {
+                state.isStreaming = false;
+                state.streamingThreadId = null;
+              });
+            }
+          } catch (error) {
+            set((state) => {
+              state.error = error instanceof Error ? error.message : 'Failed to send message';
+              state.isStreaming = false;
+              state.streamingThreadId = null;
+            });
+          }
+        },
+      }))
+    ),
+    { name: 'message-store' }
+  )
+);
+
+// Selectors for optimized re-renders
+export const useThreadMessages = (threadId: string | null) =>
+  useMessageStore((state) => 
+    threadId ? state.messagesByThread[threadId] || [] : []
+  );
+
+export const useIsStreamingForThread = (threadId: string | null) =>
+  useMessageStore((state) => 
+    state.isStreaming && state.streamingThreadId === threadId
+  );

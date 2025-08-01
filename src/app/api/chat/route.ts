@@ -1,16 +1,22 @@
 // API route for chat functionality with streaming support
-import { NextRequest } from 'next/server';
-import { MessageManager } from '@/modules/messages';
-import { chatService } from '@/modules/llm';
-import { mcpServer } from '@/modules/mcp';
-import { withApiMiddleware, schemas, rateLimits, ApiUtils } from '@/modules/api';
+import { NextRequest, NextResponse } from "next/server";
+import { MessageManager } from "@/modules/messages";
+import { chatService } from "@/modules/llm";
+import { mcpServer } from "@/modules/mcp";
+import {
+  withApiMiddleware,
+  schemas,
+  rateLimits,
+  ApiUtils,
+} from "@/modules/api";
+import { MessageRole } from "@/types";
 
 // POST /api/chat - Send message and get AI response
 export const POST = withApiMiddleware(
-  { 
-    auth: true, 
+  {
+    auth: true,
     rateLimit: rateLimits.chat,
-    validation: schemas.chatRequest
+    validation: schemas.chatRequest,
   },
   async (request: NextRequest, { userId, data }) => {
     try {
@@ -20,36 +26,47 @@ export const POST = withApiMiddleware(
       const userMessageResult = await MessageManager.addMessage(
         threadId!,
         message,
-        'USER',
+        MessageRole.USER,
         userId!
       );
 
       if (!userMessageResult.success) {
-        return ApiUtils.createErrorResponse(userMessageResult.error || 'Failed to save user message', 400);
+        return ApiUtils.createErrorResponse(
+          userMessageResult.error || "Failed to save user message",
+          400
+        );
       }
 
       // Get conversation context
-      const messagesResult = await MessageManager.getThreadMessages(threadId!, userId!);
+      const messagesResult = await MessageManager.getThreadMessages(
+        threadId!,
+        userId!
+      );
       if (!messagesResult.success) {
-        return ApiUtils.createErrorResponse('Failed to get conversation history', 500);
+        return ApiUtils.createErrorResponse(
+          "Failed to get conversation history",
+          500
+        );
       }
 
       // Get relevant context from knowledge base
       const contextResult = await mcpServer.getContext(message, userId!, {
         maxChunks: 5,
-        minRelevanceScore: 0.2
+        minRelevanceScore: 0.2,
       });
 
       const context = contextResult.success ? contextResult.data : [];
 
       // Format messages for LLM
-      const formattedMessages = MessageManager.formatMessagesForLLM(messagesResult.data!);
+      const formattedMessages = MessageManager.formatMessagesForLLM(
+        messagesResult.data!
+      );
 
       if (stream) {
         // Return streaming response
         const encoder = new TextEncoder();
         let assistantMessageId: string | null = null;
-        let assistantContent = '';
+        let assistantContent = "";
 
         const stream = new ReadableStream({
           async start(controller) {
@@ -67,37 +84,38 @@ export const POST = withApiMiddleware(
                 async () => {
                   try {
                     // Save assistant message
-                    const assistantMessageResult = await MessageManager.addMessage(
-                      threadId!,
-                      assistantContent,
-                      'ASSISTANT',
-                      userId!
-                    );
+                    const assistantMessageResult =
+                      await MessageManager.addMessage(
+                        threadId!,
+                        assistantContent,
+                        MessageRole.ASSISTANT,
+                        userId!
+                      );
 
                     if (assistantMessageResult.success) {
                       assistantMessageId = assistantMessageResult.data!.id;
                     }
 
-                    const data = JSON.stringify({ 
-                      content: '', 
-                      done: true, 
-                      messageId: assistantMessageId 
+                    const data = JSON.stringify({
+                      content: "",
+                      done: true,
+                      messageId: assistantMessageId,
                     });
                     controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-                    controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                     controller.close();
                   } catch (error) {
-                    console.error('Error saving assistant message:', error);
+                    console.error("Error saving assistant message:", error);
                     controller.error(error);
                   }
                 },
                 // onError
                 (error: Error) => {
-                  console.error('Streaming error:', error);
-                  const data = JSON.stringify({ 
-                    content: '', 
-                    done: true, 
-                    error: error.message 
+                  console.error("Streaming error:", error);
+                  const data = JSON.stringify({
+                    content: "",
+                    done: true,
+                    error: error.message,
                   });
                   controller.enqueue(encoder.encode(`data: ${data}\n\n`));
                   controller.close();
@@ -105,17 +123,18 @@ export const POST = withApiMiddleware(
                 { model, temperature }
               );
             } catch (error) {
-              console.error('Chat processing error:', error);
+              console.error("Chat processing error:", error);
               controller.error(error);
             }
-          }
+          },
         });
 
-        return new Response(stream, {
+        // Create NextResponse for streaming
+        return new NextResponse(stream, {
           headers: {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-            'Connection': 'keep-alive',
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
           },
         });
       } else {
@@ -127,19 +146,25 @@ export const POST = withApiMiddleware(
         );
 
         if (!response.success) {
-          return ApiUtils.createErrorResponse(response.error || 'Failed to process message', 500);
+          return ApiUtils.createErrorResponse(
+            response.error || "Failed to process message",
+            500
+          );
         }
 
         // Save assistant message
         const assistantMessageResult = await MessageManager.addMessage(
           threadId!,
           response.data!.content,
-          'ASSISTANT',
+          MessageRole.ASSISTANT,
           userId!
         );
 
         if (!assistantMessageResult.success) {
-          console.error('Failed to save assistant message:', assistantMessageResult.error);
+          console.error(
+            "Failed to save assistant message:",
+            assistantMessageResult.error
+          );
         }
 
         return ApiUtils.createResponse({
@@ -147,13 +172,13 @@ export const POST = withApiMiddleware(
           data: {
             content: response.data!.content,
             messageId: assistantMessageResult.data?.id,
-            usage: response.data!.usage
-          }
+            usage: response.data!.usage,
+          },
         });
       }
     } catch (error) {
-      console.error('Chat API error:', error);
-      return ApiUtils.createErrorResponse('Internal server error', 500);
+      console.error("Chat API error:", error);
+      return ApiUtils.createErrorResponse("Internal server error", 500);
     }
   }
 );
