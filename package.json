@@ -36,9 +36,13 @@
     "sonner": "^2.0.6",
     "tailwind-merge": "^3.3.1",
     "uuid": "^11.1.0",
-    "zod": "^4.0.14",
+    "zod": "^3.25.76",
     "zustand": "^5.0.2",
-    "immer": "^10.1.1"
+    "immer": "^10.1.1",
+    "llamaindex": "^0.8.37",
+    "@llamaindex/readers": "^3.1.18",
+    "@qdrant/js-client-rest": "^1.15.0",
+    "openai": "^4.104.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
