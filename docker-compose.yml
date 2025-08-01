@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # MySQL Database
+  db:
+    image: mysql:8.0
+    container_name: chat-kb-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: chat_knowledge_base
+      MYSQL_USER: chatuser
+      MYSQL_PASSWORD: chatpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # Maxim AI Bifrost LLM Gateway
+  bifrost:
+    image: maximhq/bifrost
+    container_name: chat-kb-bifrost
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+    networks:
+      - chat-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Next.js Web Application
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chat-kb-web
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Database
+      - DATABASE_URL=mysql://chatuser:chatpassword@db:3306/chat_knowledge_base
+      
+      # Auth.js
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=your-super-secret-key-change-in-production
+      
+      # Email (configure with your SMTP settings)
+      - EMAIL_SERVER_HOST=smtp.gmail.com
+      - EMAIL_SERVER_PORT=587
+      - EMAIL_SERVER_USER=your-email@gmail.com
+      - EMAIL_SERVER_PASSWORD=your-app-password
+      - EMAIL_FROM=your-email@gmail.com
+      
+      # Bifrost LLM Gateway
+      - BIFROST_API_URL=http://bifrost:9000
+      
+      # File uploads
+      - UPLOAD_DIR=/app/uploads
+      - MAX_FILE_SIZE=10485760
+      
+      # App config
+      - NODE_ENV=production
+      - PORT=3000
+    volumes:
+      - uploads_data:/app/uploads
+    networks:
+      - chat-network
+    depends_on:
+      db:
+        condition: service_healthy
+      bifrost:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  mysql_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  chat-network:
+    driver: bridge
