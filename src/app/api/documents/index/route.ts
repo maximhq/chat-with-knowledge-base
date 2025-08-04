@@ -59,6 +59,20 @@ export async function POST(request: NextRequest) {
       session.user.id
     );
 
+    // Check if indexing was successful
+    if (!indexResult.success) {
+      console.error("Document indexing failed:", indexResult.error);
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Failed to index document: ${indexResult.error}`,
+          documentProcessed: true, // File was processed but indexing failed
+          chunksProcessed: result.chunks.length,
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       documentId: `doc_${fileName}_${Date.now()}`,

@@ -20,7 +20,7 @@ export class LLMGateway {
 
   constructor(config?: Partial<BifrostConfig>) {
     this.config = {
-      apiUrl: process.env.BIFROST_API_URL || "http://localhost:9000",
+      apiUrl: process.env.BIFROST_API_URL || "http://localhost:8080",
       apiKey: process.env.BIFROST_API_KEY,
       timeout: 30000, // 30 seconds
       retries: 3,
@@ -41,7 +41,7 @@ export class LLMGateway {
   async chatCompletion(request: LLMRequest): Promise<ApiResponse<LLMResponse>> {
     try {
       // Convert our message format to OpenAI SDK format
-      const messages = request.messages.map(msg => ({
+      const messages = request.messages.map((msg) => ({
         role: msg.role as "system" | "user" | "assistant",
         content: msg.content,
       }));
@@ -57,11 +57,13 @@ export class LLMGateway {
       });
 
       // Convert OpenAI usage format to our format
-      const usage = response.usage ? {
-        promptTokens: response.usage.prompt_tokens,
-        completionTokens: response.usage.completion_tokens,
-        totalTokens: response.usage.total_tokens,
-      } : undefined;
+      const usage = response.usage
+        ? {
+            promptTokens: response.usage.prompt_tokens,
+            completionTokens: response.usage.completion_tokens,
+            totalTokens: response.usage.total_tokens,
+          }
+        : undefined;
 
       return {
         success: true,

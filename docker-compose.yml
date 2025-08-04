@@ -45,7 +45,7 @@ services:
     container_name: chat-kb-bifrost
     restart: unless-stopped
     ports:
-      - "9000:9000"
+      - "8080:8080"
     volumes:
       - bifrost_data:/app/data
     networks:
@@ -58,7 +58,7 @@ services:
           "--no-verbose",
           "--tries=1",
           "--spider",
-          "http://localhost:9000",
+          "http://localhost:8080",
         ]
       interval: 30s
       timeout: 10s
@@ -89,7 +89,7 @@ services:
       - EMAIL_FROM=your-email@gmail.com
 
       # Bifrost LLM Gateway
-      - BIFROST_API_URL=http://bifrost:9000
+      - BIFROST_API_URL=http://bifrost:8080
 
       # Qdrant Vector Database
       - QDRANT_URL=http://qdrant:6333

@@ -59,31 +59,10 @@ export function KnowledgeBaseInterface() {
     }
   };
 
-  const handleFileUpload = async (files: File[]) => {
-    for (const file of files) {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      try {
-        const response = await fetch("/api/documents/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            setDocuments((prev) => [data.data, ...prev]);
-            toast.success(`${file.name} uploaded successfully`);
-          }
-        } else {
-          toast.error(`Failed to upload ${file.name}`);
-        }
-      } catch (error) {
-        console.error("Upload error:", error);
-        toast.error(`Error uploading ${file.name}`);
-      }
-    }
+  const handleFileUpload = async () => {
+    // FileUploadDropzone will handle the actual upload
+    // This is just a callback to refresh the documents list
+    await fetchDocuments();
   };
 
   const handleAddLink = async () => {
@@ -190,204 +169,116 @@ export function KnowledgeBaseInterface() {
   };
 
   return (
-    <div className="h-full flex flex-col p-6">
-      <div className="max-w-6xl mx-auto flex flex-col h-full">
-        <div className="mb-6 flex-shrink-0">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Knowledge Base
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Upload documents and add links to build your knowledge base for
-            AI-powered conversations.
-          </p>
-        </div>
+    <div className="h-full flex flex-col">
+      <ScrollArea className="h-[calc(100vh-4rem)]">
+        <div className="p-6">
+          <div className="max-w-6xl mx-auto flex flex-col">
+            <div className="mb-6 flex-shrink-0">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                Knowledge Base
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400">
+                Upload documents and add links to build your knowledge base for
+                AI-powered conversations.
+              </p>
+            </div>
 
-        <Tabs defaultValue="documents" className="flex flex-col flex-1 min-h-0">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger
-              value="documents"
-              className="flex items-center space-x-2"
+            <Tabs
+              defaultValue="documents"
+              className="flex flex-col flex-1 min-h-0"
             >
-              <FileText className="h-4 w-4" />
-              <span>Documents</span>
-            </TabsTrigger>
-            <TabsTrigger value="links" className="flex items-center space-x-2">
-              <Link className="h-4 w-4" />
-              <span>External Links</span>
-            </TabsTrigger>
-          </TabsList>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger
+                  value="documents"
+                  className="flex items-center space-x-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  <span>Documents</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="links"
+                  className="flex items-center space-x-2"
+                >
+                  <Link className="h-4 w-4" />
+                  <span>External Links</span>
+                </TabsTrigger>
+              </TabsList>
 
-          <TabsContent
-            value="documents"
-            className="flex flex-col flex-1 min-h-0 space-y-6"
-          >
-            {/* File Upload Area */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Upload className="h-5 w-5" />
-                  <span>Upload Documents</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <FileUploadDropzone onFilesSelected={handleFileUpload} />
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                  Supported formats: PDF, DOCX, DOC, TXT, MD (Max 10MB per file)
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Documents List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Uploaded Documents ({documents.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
-                  </div>
-                ) : documents.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No documents uploaded yet</p>
-                    <p className="text-sm mt-1">
-                      Upload your first document to get started
+              <TabsContent
+                value="documents"
+                className="flex flex-col flex-1 min-h-0 space-y-6"
+              >
+                {/* File Upload Area */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Upload className="h-5 w-5" />
+                      <span>Upload Documents</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <FileUploadDropzone onFilesSelected={handleFileUpload} />
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                      Supported formats: PDF, DOCX, DOC, TXT, MD (Max 10MB per
+                      file)
                     </p>
-                  </div>
-                ) : (
-                  <ScrollArea className="h-96">
-                    <div className="space-y-3">
-                      {documents.map((document) => (
-                        <div
-                          key={document.id}
-                          className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <span className="text-2xl">
-                              {getFileIcon(document.mimeType)}
-                            </span>
-                            <div>
-                              <h3 className="font-medium text-gray-900 dark:text-white">
-                                {document.originalName}
-                              </h3>
-                              <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                                <span>{formatFileSize(document.size)}</span>
-                                <span
-                                  className={`px-2 py-1 rounded-full text-xs ${getStatusColor(
-                                    document.status
-                                  )}`}
-                                >
-                                  {document.status}
-                                </span>
-                                <span>
-                                  {new Date(
-                                    document.createdAt
-                                  ).toLocaleDateString()}
-                                </span>
+                  </CardContent>
+                </Card>
+
+                {/* Documents List */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      Uploaded Documents ({documents.length})
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
+                      </div>
+                    ) : documents.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No documents uploaded yet</p>
+                        <p className="text-sm mt-1">
+                          Upload your first document to get started
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {documents.map((document) => (
+                          <div
+                            key={document.id}
+                            className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <span className="text-2xl">
+                                {getFileIcon(document.mimeType)}
+                              </span>
+                              <div>
+                                <h3 className="font-medium text-gray-900 dark:text-white">
+                                  {document.originalName}
+                                </h3>
+                                <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                                  <span>{formatFileSize(document.size)}</span>
+                                  <span
+                                    className={`px-2 py-1 rounded-full text-xs ${getStatusColor(
+                                      document.status
+                                    )}`}
+                                  >
+                                    {document.status}
+                                  </span>
+                                  <span>
+                                    {new Date(
+                                      document.createdAt
+                                    ).toLocaleDateString()}
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <Button
-                            onClick={() => handleDeleteDocument(document.id)}
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent
-            value="links"
-            className="flex flex-col flex-1 min-h-0 space-y-6"
-          >
-            {/* Add Link */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Plus className="h-5 w-5" />
-                  <span>Add External Link</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex space-x-2">
-                  <Input
-                    placeholder="Enter URL (e.g., https://example.com)"
-                    value={newLinkUrl}
-                    onChange={(e) => setNewLinkUrl(e.target.value)}
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddLink();
-                      }
-                    }}
-                  />
-                  <Button onClick={handleAddLink} disabled={!newLinkUrl.trim()}>
-                    Add Link
-                  </Button>
-                </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                  Add web pages, articles, or any online content to your
-                  knowledge base
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Links List */}
-            <Card>
-              <CardHeader>
-                <CardTitle>External Links ({links.length})</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {links.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                    <Link className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No external links added yet</p>
-                    <p className="text-sm mt-1">
-                      Add your first link to expand your knowledge base
-                    </p>
-                  </div>
-                ) : (
-                  <ScrollArea className="h-96">
-                    <div className="space-y-3">
-                      {links.map((link) => (
-                        <div
-                          key={link.id}
-                          className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                        >
-                          <div className="flex items-center space-x-3 flex-1 min-w-0">
-                            <ExternalLink className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                                {link.title || link.url}
-                              </h3>
-                              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                {link.url}
-                              </p>
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                Added{" "}
-                                {new Date(link.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-2">
                             <Button
-                              onClick={() => window.open(link.url, "_blank")}
-                              size="sm"
-                              variant="ghost"
-                              className="text-blue-500 hover:text-blue-700"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              onClick={() => handleDeleteLink(link.id)}
+                              onClick={() => handleDeleteDocument(document.id)}
                               size="sm"
                               variant="ghost"
                               className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
@@ -395,16 +286,122 @@ export function KnowledgeBaseInterface() {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent
+                value="links"
+                className="flex flex-col flex-1 min-h-0"
+              >
+                <div className="space-y-6 p-1">
+                  {/* Add Link */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <Plus className="h-5 w-5" />
+                        <span>Add External Link</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex space-x-2">
+                        <Input
+                          placeholder="Enter URL (e.g., https://example.com)"
+                          value={newLinkUrl}
+                          onChange={(e) => setNewLinkUrl(e.target.value)}
+                          onKeyPress={(e) => {
+                            if (e.key === "Enter") {
+                              handleAddLink();
+                            }
+                          }}
+                        />
+                        <Button
+                          onClick={handleAddLink}
+                          disabled={!newLinkUrl.trim()}
+                        >
+                          Add Link
+                        </Button>
+                      </div>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                        Add web pages, articles, or any online content to your
+                        knowledge base
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Links List */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>External Links ({links.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {links.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <Link className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p>No external links added yet</p>
+                          <p className="text-sm mt-1">
+                            Add your first link to expand your knowledge base
+                          </p>
                         </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {links.map((link) => (
+                            <div
+                              key={link.id}
+                              className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                            >
+                              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                                <ExternalLink className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="font-medium text-gray-900 dark:text-white truncate">
+                                    {link.title || link.url}
+                                  </h3>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                                    {link.url}
+                                  </p>
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                                    Added{" "}
+                                    {new Date(
+                                      link.createdAt
+                                    ).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Button
+                                  onClick={() =>
+                                    window.open(link.url, "_blank")
+                                  }
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-blue-500 hover:text-blue-700"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleDeleteLink(link.id)}
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+      </ScrollArea>
     </div>
   );
 }

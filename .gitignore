@@ -44,3 +44,7 @@ next-env.d.ts
 
 # bifrost
 bifrost-data
+
+
+# uploads
+uploads

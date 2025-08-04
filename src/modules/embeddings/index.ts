@@ -16,10 +16,11 @@ export class EmbeddingManager {
 
   constructor() {
     // Use OpenAI SDK with Bifrost's OpenAI-compatible endpoint
+    const bifrostUrl = process.env.BIFROST_API_URL || "http://localhost:8080";
+    console.log("Bifrost URL:", bifrostUrl);
+
     this.openai = new OpenAI({
-      baseURL: `${
-        process.env.BIFROST_API_URL || "http://localhost:9000"
-      }/openai`,
+      baseURL: `${bifrostUrl}/openai`, // Bifrost should handle OpenAI-compatible endpoints directly
       apiKey: "dummy-api-key", // Handled by Bifrost
     });
   }
