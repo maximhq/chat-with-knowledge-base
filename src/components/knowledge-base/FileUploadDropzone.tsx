@@ -118,7 +118,7 @@ export function FileUploadDropzone({
             }
 
             // Upload file to server
-            const uploadResponse = await fetch("/api/files/upload", {
+            const uploadResponse = await fetch("/api/documents/upload", {
               method: "POST",
               body: formData,
             });

@@ -4,7 +4,7 @@ import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, MessageSquare, Trash2 } from "lucide-react";
-import { useSession, signOut } from "next-auth/react";
+
 import { useThreadStore } from "@/stores";
 import type { Thread } from "@/types";
 
@@ -19,7 +19,6 @@ export function Sidebar({
   onThreadSelect,
   onNewThread,
 }: SidebarProps) {
-  const { data: session } = useSession();
   const threads = useThreadStore((state) => state.threads);
   const isLoading = useThreadStore((state) => state.isLoading);
   const fetchThreads = useThreadStore((state) => state.fetchThreads);
@@ -148,30 +147,6 @@ export function Sidebar({
           )}
         </div>
       </ScrollArea>
-
-      {/* Footer */}
-      <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center">
-              <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                {session?.user?.email?.[0]?.toUpperCase() || "U"}
-              </span>
-            </div>
-            <span className="text-sm text-gray-600 dark:text-gray-400 truncate">
-              {session?.user?.email}
-            </span>
-          </div>
-          <Button
-            onClick={() => signOut()}
-            size="sm"
-            variant="ghost"
-            className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-          >
-            Sign out
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

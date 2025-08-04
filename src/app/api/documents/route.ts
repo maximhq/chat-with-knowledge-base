@@ -1,7 +1,7 @@
 // API routes for document management
-import { NextRequest } from 'next/server';
-import { FileUploadManager } from '@/modules/uploads';
-import { withApiMiddleware, rateLimits, ApiUtils } from '@/modules/api';
+import { NextRequest } from "next/server";
+import { FileUploadManager } from "@/modules/uploads";
+import { withApiMiddleware, rateLimits, ApiUtils } from "@/modules/api";
 
 // GET /api/documents - Get all documents for authenticated user
 export const GET = withApiMiddleware(
@@ -18,17 +18,17 @@ export const POST = withApiMiddleware(
   async (request: NextRequest, { userId }) => {
     try {
       const formData = await request.formData();
-      const file = formData.get('file') as File;
-      
+      const file = formData.get("file") as File;
+
       if (!file) {
-        return ApiUtils.createErrorResponse('No file provided', 400);
+        return ApiUtils.createErrorResponse("No file provided", 400);
       }
 
       const result = await FileUploadManager.uploadFile(file, userId!);
       return ApiUtils.createResponse(result, result.success ? 201 : 400);
     } catch (error) {
-      console.error('Document upload error:', error);
-      return ApiUtils.createErrorResponse('Failed to upload document', 500);
+      console.error("Document upload error:", error);
+      return ApiUtils.createErrorResponse("Failed to upload document", 500);
     }
   }
 );
