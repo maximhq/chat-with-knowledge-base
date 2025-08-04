@@ -1,4 +1,5 @@
-// LLM Gateway Module - Interface with Maxim AI Bifrost
+// LLM Gateway Module - Interface with Maxim AI Bifrost via OpenAI SDK
+import { OpenAI } from "openai";
 import type {
   LLMRequest,
   LLMResponse,
@@ -14,6 +15,7 @@ export interface BifrostConfig {
 }
 
 export class LLMGateway {
+  private openai: OpenAI;
   private config: BifrostConfig;
 
   constructor(config?: Partial<BifrostConfig>) {
@@ -24,47 +26,49 @@ export class LLMGateway {
       retries: 3,
       ...config,
     };
+
+    // Use OpenAI SDK with Bifrost's OpenAI-compatible endpoint
+    this.openai = new OpenAI({
+      baseURL: `${this.config.apiUrl}/openai`,
+      apiKey: "dummy-api-key", // Handled by Bifrost
+      timeout: this.config.timeout,
+    });
   }
 
   /**
-   * Send a chat completion request to Bifrost
+   * Send a chat completion request to Bifrost via OpenAI SDK
    */
   async chatCompletion(request: LLMRequest): Promise<ApiResponse<LLMResponse>> {
     try {
-      const response = await this.makeRequest("/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(this.config.apiKey && {
-            Authorization: `Bearer ${this.config.apiKey}`,
-          }),
-        },
-        body: JSON.stringify({
-          model: request.model || "gpt-3.5-turbo",
-          messages: request.messages,
-          temperature: request.temperature || 0.7,
-          max_tokens: request.maxTokens || 2000,
-          stream: request.stream || false,
-        }),
+      // Convert our message format to OpenAI SDK format
+      const messages = request.messages.map(msg => ({
+        role: msg.role as "system" | "user" | "assistant",
+        content: msg.content,
+      }));
+
+      // Use OpenAI SDK with Bifrost's OpenAI-compatible endpoint
+      // For now, we only support non-streaming responses
+      const response = await this.openai.chat.completions.create({
+        model: request.model || "gpt-3.5-turbo",
+        messages,
+        temperature: request.temperature || 0.7,
+        max_tokens: request.maxTokens || 2000,
+        stream: false, // Force non-streaming for type safety
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          `Bifrost API error: ${response.status} - ${
-            errorData.error || response.statusText
-          }`
-        );
-      }
-
-      const data = await response.json();
+      // Convert OpenAI usage format to our format
+      const usage = response.usage ? {
+        promptTokens: response.usage.prompt_tokens,
+        completionTokens: response.usage.completion_tokens,
+        totalTokens: response.usage.total_tokens,
+      } : undefined;
 
       return {
         success: true,
         data: {
-          content: data.choices[0]?.message?.content || "",
-          usage: data.usage,
-          model: data.model,
+          content: response.choices[0]?.message?.content || "",
+          usage,
+          model: response.model,
         },
         message: "Chat completion successful",
       };

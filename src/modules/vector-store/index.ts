@@ -58,7 +58,7 @@ export class VectorStoreManager {
   private async createCollection(): Promise<void> {
     await this.client.createCollection(this.config.collectionName, {
       vectors: {
-        size: 1536, // OpenAI text-embedding-3-small dimension
+        size: 1536, // text-embedding-3-small dimension (via Bifrost)
         distance: "Cosine",
       },
       optimizers_config: {

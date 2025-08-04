@@ -100,7 +100,9 @@ export class ApiUtils {
       return { success: true, data };
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const { errors } = z.treeifyError(error);
+        const errors = error.errors.map(
+          (err) => `${err.path.join(".")}: ${err.message}`
+        );
         return { success: false, errors };
       }
       return { success: false, errors: ["Invalid request data"] };
@@ -212,22 +214,22 @@ export class RateLimiter {
 export async function requireAuth(): Promise<ApiResponse<null> | null> {
   try {
     const session = await auth();
-    
+
     if (!session?.user?.id) {
       return {
         success: false,
-        error: 'Authentication required',
-        data: null
+        error: "Authentication required",
+        data: null,
       };
     }
-    
+
     return null; // No error, user is authenticated
   } catch (error) {
-    console.error('Auth check error:', error);
+    console.error("Auth check error:", error);
     return {
       success: false,
-      error: 'Authentication failed',
-      data: null
+      error: "Authentication failed",
+      data: null,
     };
   }
 }

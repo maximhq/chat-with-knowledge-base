@@ -1,8 +1,8 @@
-import { create } from 'zustand';
-import { devtools, subscribeWithSelector } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-import type { Message } from '@/types';
-import { MessageRole } from '@/types';
+import { create } from "zustand";
+import { devtools, subscribeWithSelector } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
+import type { Message } from "@/types";
+import { MessageRole } from "@/types";
 
 interface MessageState {
   // State - organized by threadId
@@ -11,17 +11,25 @@ interface MessageState {
   isStreaming: boolean;
   streamingThreadId: string | null;
   error: string | null;
-  
+
   // Actions
   setMessages: (threadId: string, messages: Message[]) => void;
   addMessage: (threadId: string, message: Message) => void;
-  updateMessage: (threadId: string, messageId: string, updates: Partial<Message>) => void;
-  appendToMessage: (threadId: string, messageId: string, content: string) => void;
+  updateMessage: (
+    threadId: string,
+    messageId: string,
+    updates: Partial<Message>
+  ) => void;
+  appendToMessage: (
+    threadId: string,
+    messageId: string,
+    content: string
+  ) => void;
   clearMessages: (threadId: string) => void;
   setLoading: (loading: boolean) => void;
   setStreaming: (streaming: boolean, threadId?: string) => void;
   setError: (error: string | null) => void;
-  
+
   // Async actions
   fetchMessages: (threadId: string) => Promise<void>;
   sendMessage: (threadId: string, content: string) => Promise<void>;
@@ -114,14 +122,15 @@ export const useMessageStore = create<MessageState>()(
                   state.isLoading = false;
                 });
               } else {
-                throw new Error(data.error || 'Failed to fetch messages');
+                throw new Error(data.error || "Failed to fetch messages");
               }
             } else {
-              throw new Error('Failed to fetch messages');
+              throw new Error("Failed to fetch messages");
             }
           } catch (error) {
             set((state) => {
-              state.error = error instanceof Error ? error.message : 'Unknown error';
+              state.error =
+                error instanceof Error ? error.message : "Unknown error";
               state.isLoading = false;
             });
           }
@@ -149,9 +158,9 @@ export const useMessageStore = create<MessageState>()(
           });
 
           try {
-            const response = await fetch('/api/chat', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            const response = await fetch("/api/chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 message: content,
                 threadId,
@@ -160,20 +169,20 @@ export const useMessageStore = create<MessageState>()(
             });
 
             if (!response.ok) {
-              throw new Error('Failed to send message');
+              throw new Error("Failed to send message");
             }
 
             // Handle streaming response
             const reader = response.body?.getReader();
             if (!reader) {
-              throw new Error('No response body reader');
+              throw new Error("No response body reader");
             }
 
             // Add assistant message placeholder
             const assistantMessage: Message = {
               id: `temp-assistant-${Date.now()}`,
               threadId,
-              content: '',
+              content: "",
               role: MessageRole.ASSISTANT,
               createdAt: new Date(),
             };
@@ -183,7 +192,7 @@ export const useMessageStore = create<MessageState>()(
             });
 
             const decoder = new TextDecoder();
-            let buffer = '';
+            let buffer = "";
 
             try {
               while (true) {
@@ -191,13 +200,13 @@ export const useMessageStore = create<MessageState>()(
                 if (done) break;
 
                 buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
 
                 for (const line of lines) {
-                  if (line.startsWith('data: ')) {
+                  if (line.startsWith("data: ")) {
                     const data = line.slice(6);
-                    if (data === '[DONE]') {
+                    if (data === "[DONE]") {
                       set((state) => {
                         state.isStreaming = false;
                         state.streamingThreadId = null;
@@ -211,7 +220,10 @@ export const useMessageStore = create<MessageState>()(
                         set((state) => {
                           const messages = state.messagesByThread[threadId];
                           const lastMessage = messages[messages.length - 1];
-                          if (lastMessage && lastMessage.role === MessageRole.ASSISTANT) {
+                          if (
+                            lastMessage &&
+                            lastMessage.role === MessageRole.ASSISTANT
+                          ) {
                             lastMessage.content += parsed.content;
                           }
                         });
@@ -231,7 +243,10 @@ export const useMessageStore = create<MessageState>()(
             }
           } catch (error) {
             set((state) => {
-              state.error = error instanceof Error ? error.message : 'Failed to send message';
+              state.error =
+                error instanceof Error
+                  ? error.message
+                  : "Failed to send message";
               state.isStreaming = false;
               state.streamingThreadId = null;
             });
@@ -239,17 +254,21 @@ export const useMessageStore = create<MessageState>()(
         },
       }))
     ),
-    { name: 'message-store' }
+    { name: "message-store" }
   )
 );
 
+// Empty array constant to prevent re-renders
+const EMPTY_MESSAGES: Message[] = [];
+
 // Selectors for optimized re-renders
 export const useThreadMessages = (threadId: string | null) =>
-  useMessageStore((state) => 
-    threadId ? state.messagesByThread[threadId] || [] : []
-  );
+  useMessageStore((state) => {
+    if (!threadId) return EMPTY_MESSAGES;
+    return state.messagesByThread[threadId] || EMPTY_MESSAGES;
+  });
 
 export const useIsStreamingForThread = (threadId: string | null) =>
-  useMessageStore((state) => 
-    state.isStreaming && state.streamingThreadId === threadId
+  useMessageStore(
+    (state) => state.isStreaming && state.streamingThreadId === threadId
   );

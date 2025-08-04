@@ -1,20 +1,20 @@
-import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
+import { create } from "zustand";
+import { devtools, persist } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
 
-type ActiveTab = 'messages' | 'knowledge-base';
+type ActiveTab = "messages" | "knowledge-base";
 
 interface UIState {
   // State
   activeTab: ActiveTab;
   sidebarCollapsed: boolean;
-  theme: 'light' | 'dark' | 'system';
-  
+  theme: "light" | "dark" | "system";
+
   // Actions
   setActiveTab: (tab: ActiveTab) => void;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
-  setTheme: (theme: 'light' | 'dark' | 'system') => void;
+  setTheme: (theme: "light" | "dark" | "system") => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -22,9 +22,9 @@ export const useUIStore = create<UIState>()(
     persist(
       immer((set) => ({
         // Initial state
-        activeTab: 'messages',
+        activeTab: "messages",
         sidebarCollapsed: false,
-        theme: 'system',
+        theme: "system",
 
         // Actions
         setActiveTab: (tab) =>
@@ -48,18 +48,19 @@ export const useUIStore = create<UIState>()(
           }),
       })),
       {
-        name: 'ui-store',
+        name: "ui-store",
         partialize: (state) => ({
           theme: state.theme,
           sidebarCollapsed: state.sidebarCollapsed,
         }),
       }
     ),
-    { name: 'ui-store' }
+    { name: "ui-store" }
   )
 );
 
 // Selectors
 export const useActiveTab = () => useUIStore((state) => state.activeTab);
-export const useSidebarCollapsed = () => useUIStore((state) => state.sidebarCollapsed);
+export const useSidebarCollapsed = () =>
+  useUIStore((state) => state.sidebarCollapsed);
 export const useTheme = () => useUIStore((state) => state.theme);

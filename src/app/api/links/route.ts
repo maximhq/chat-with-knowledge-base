@@ -32,7 +32,8 @@ export const POST = withApiMiddleware(
     try {
       const link = await ExternalLinkStorage.create({
         url: data!.url,
-        title: data!.title,
+        title: data!.title || null,
+        content: null,
         userId: userId!
       });
 

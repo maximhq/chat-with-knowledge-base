@@ -76,14 +76,14 @@ export class ThreadStorage {
   }
 
   static async create(
-    data: Omit<Thread, "id" | "createdAt" | "updatedAt">
+    data: { title: string; userId: string }
   ): Promise<Thread> {
     return await prisma.thread.create({
       data,
     });
   }
 
-  static async update(id: string, data: Partial<Thread>): Promise<Thread> {
+  static async update(id: string, data: { title?: string; updatedAt?: Date }): Promise<Thread> {
     return await prisma.thread.update({
       where: { id },
       data,
@@ -149,7 +149,15 @@ export class DocumentStorage {
   }
 
   static async create(
-    data: Omit<Document, "id" | "createdAt" | "updatedAt">
+    data: {
+      filename: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+      path: string;
+      status: FileStatus;
+      userId: string;
+    }
   ): Promise<Document> {
     return await prisma.document.create({
       data,

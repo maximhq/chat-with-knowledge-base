@@ -28,6 +28,8 @@ const EmailOtpProvider = Email({
 
 // NextAuth.js v5 configuration
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development-only",
+  trustHost: true, // Trust all hosts for Docker deployment
   adapter: PrismaAdapter(prisma),
   providers: [EmailOtpProvider],
   pages: {

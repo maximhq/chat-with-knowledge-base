@@ -1,4 +1,4 @@
-import { OpenAIEmbedding } from "llamaindex";
+import { OpenAI } from "openai";
 
 export interface EmbeddingResult {
   text: string;
@@ -12,13 +12,15 @@ export interface BatchEmbeddingResult {
 }
 
 export class EmbeddingManager {
-  private embedder: OpenAIEmbedding;
+  private openai: OpenAI;
 
   constructor() {
-    // Use OpenAI with sensible defaults
-    this.embedder = new OpenAIEmbedding({
-      model: "text-embedding-3-small", // Latest, cost-effective model
-      apiKey: process.env.OPENAI_API_KEY,
+    // Use OpenAI SDK with Bifrost's OpenAI-compatible endpoint
+    this.openai = new OpenAI({
+      baseURL: `${
+        process.env.BIFROST_API_URL || "http://localhost:9000"
+      }/openai`,
+      apiKey: "dummy-api-key", // Handled by Bifrost
     });
   }
 
@@ -28,7 +30,18 @@ export class EmbeddingManager {
     }
 
     try {
-      const embedding = await this.embedder.getTextEmbedding(text);
+      // Use OpenAI SDK with Bifrost's OpenAI-compatible endpoint
+      const response = await this.openai.embeddings.create({
+        input: text,
+        model: "text-embedding-3-small", // Use efficient embedding model
+      });
+
+      const embedding = response.data[0]?.embedding;
+
+      if (!embedding) {
+        throw new Error("Invalid embedding response from Bifrost");
+      }
+
       return {
         text,
         embedding,

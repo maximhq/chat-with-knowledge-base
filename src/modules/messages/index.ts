@@ -1,7 +1,12 @@
 // Message Handling Module - Per-thread message history with markdown and streaming support
-import { MessageStorage, ThreadStorage } from '@/modules/storage';
-import { ThreadManager } from '@/modules/threads';
-import type { Message, MessageRole, ApiResponse, ChatStreamResponse } from '@/types';
+import { MessageStorage, ThreadStorage } from "@/modules/storage";
+import { ThreadManager } from "@/modules/threads";
+import type {
+  Message,
+  MessageRole,
+  ApiResponse,
+  ChatStreamResponse,
+} from "@/types";
 
 export class MessageManager {
   /**
@@ -19,14 +24,14 @@ export class MessageManager {
       if (!thread) {
         return {
           success: false,
-          error: 'Thread not found'
+          error: "Thread not found",
         };
       }
 
       if (thread.userId !== userId) {
         return {
           success: false,
-          error: 'Access denied'
+          error: "Access denied",
         };
       }
 
@@ -34,17 +39,17 @@ export class MessageManager {
       const message = await MessageStorage.create({
         threadId,
         content: content.trim(),
-        role
+        role,
       });
 
       // Update thread's updatedAt timestamp
       await ThreadManager.touchThread(threadId);
 
       // If this is the first user message, update thread title
-      if (role === 'USER') {
+      if (role === "USER") {
         const messages = await MessageStorage.findByThreadId(threadId);
-        const userMessages = messages.filter(m => m.role === 'USER');
-        
+        const userMessages = messages.filter((m) => m.role === "USER");
+
         if (userMessages.length === 1) {
           const title = await ThreadManager.generateThreadTitle(content);
           await ThreadStorage.update(threadId, { title });
@@ -54,13 +59,13 @@ export class MessageManager {
       return {
         success: true,
         data: message,
-        message: 'Message added successfully'
+        message: "Message added successfully",
       };
     } catch (error) {
-      console.error('Error adding message:', error);
+      console.error("Error adding message:", error);
       return {
         success: false,
-        error: 'Failed to add message'
+        error: "Failed to add message",
       };
     }
   }
@@ -78,14 +83,14 @@ export class MessageManager {
       if (!thread) {
         return {
           success: false,
-          error: 'Thread not found'
+          error: "Thread not found",
         };
       }
 
       if (thread.userId !== userId) {
         return {
           success: false,
-          error: 'Access denied'
+          error: "Access denied",
         };
       }
 
@@ -94,13 +99,13 @@ export class MessageManager {
       return {
         success: true,
         data: messages,
-        message: `Found ${messages.length} messages`
+        message: `Found ${messages.length} messages`,
       };
     } catch (error) {
-      console.error('Error fetching thread messages:', error);
+      console.error("Error fetching thread messages:", error);
       return {
         success: false,
-        error: 'Failed to fetch messages'
+        error: "Failed to fetch messages",
       };
     }
   }
@@ -117,7 +122,7 @@ export class MessageManager {
       if (!message) {
         return {
           success: false,
-          error: 'Message not found'
+          error: "Message not found",
         };
       }
 
@@ -126,7 +131,7 @@ export class MessageManager {
       if (!thread || thread.userId !== userId) {
         return {
           success: false,
-          error: 'Access denied'
+          error: "Access denied",
         };
       }
 
@@ -134,13 +139,13 @@ export class MessageManager {
 
       return {
         success: true,
-        message: 'Message deleted successfully'
+        message: "Message deleted successfully",
       };
     } catch (error) {
-      console.error('Error deleting message:', error);
+      console.error("Error deleting message:", error);
       return {
         success: false,
-        error: 'Failed to delete message'
+        error: "Failed to delete message",
       };
     }
   }
@@ -148,33 +153,38 @@ export class MessageManager {
   /**
    * Format messages for LLM consumption
    */
-  static formatMessagesForLLM(messages: Message[]): Array<{ role: string; content: string }> {
-    return messages.map(message => ({
+  static formatMessagesForLLM(
+    messages: Message[]
+  ): Array<{ role: string; content: string }> {
+    return messages.map((message) => ({
       role: message.role.toLowerCase(),
-      content: message.content
+      content: message.content,
     }));
   }
 
   /**
    * Validate message content
    */
-  static validateMessageContent(content: string): { isValid: boolean; errors: string[] } {
+  static validateMessageContent(content: string): {
+    isValid: boolean;
+    errors: string[];
+  } {
     const errors: string[] = [];
 
-    if (!content || typeof content !== 'string') {
-      errors.push('Message content is required');
+    if (!content || typeof content !== "string") {
+      errors.push("Message content is required");
     } else {
       const trimmed = content.trim();
       if (trimmed.length === 0) {
-        errors.push('Message content cannot be empty');
+        errors.push("Message content cannot be empty");
       } else if (trimmed.length > 10000) {
-        errors.push('Message content cannot exceed 10,000 characters');
+        errors.push("Message content cannot exceed 10,000 characters");
       }
     }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
     };
   }
 
@@ -184,25 +194,27 @@ export class MessageManager {
   static processMarkdown(content: string): string {
     // Basic markdown processing - in production, use a proper markdown library
     return content
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`(.*?)`/g, '<code>$1</code>')
-      .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-      .replace(/\n/g, '<br>');
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/`(.*?)`/g, "<code>$1</code>")
+      .replace(/```([\s\S]*?)```/g, "<pre><code>$1</code></pre>")
+      .replace(/\n/g, "<br>");
   }
 
   /**
    * Extract code blocks from message content
    */
-  static extractCodeBlocks(content: string): Array<{ language: string; code: string }> {
+  static extractCodeBlocks(
+    content: string
+  ): Array<{ language: string; code: string }> {
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
     const codeBlocks: Array<{ language: string; code: string }> = [];
     let match;
 
     while ((match = codeBlockRegex.exec(content)) !== null) {
       codeBlocks.push({
-        language: match[1] || 'text',
-        code: match[2].trim()
+        language: match[1] || "text",
+        code: match[2].trim(),
       });
     }
 
@@ -213,7 +225,7 @@ export class MessageManager {
    * Get conversation context for LLM (last N messages)
    */
   static getConversationContext(
-    messages: Message[], 
+    messages: Message[],
     maxMessages: number = 20
   ): Message[] {
     return messages.slice(-maxMessages);
@@ -231,7 +243,7 @@ export class MessageManager {
    * Truncate conversation to fit token limit
    */
   static truncateConversation(
-    messages: Message[], 
+    messages: Message[],
     maxTokens: number = 4000
   ): Message[] {
     let totalTokens = 0;
@@ -241,11 +253,11 @@ export class MessageManager {
     for (let i = messages.length - 1; i >= 0; i--) {
       const message = messages[i];
       const messageTokens = this.estimateTokenCount(message.content);
-      
+
       if (totalTokens + messageTokens > maxTokens) {
         break;
       }
-      
+
       totalTokens += messageTokens;
       truncatedMessages.unshift(message);
     }
@@ -255,7 +267,7 @@ export class MessageManager {
 }
 
 // Streaming message handler for real-time responses
-export class StreamingMessageHandler {
+class StreamingMessageHandler {
   private static activeStreams = new Map<string, AbortController>();
 
   /**
@@ -288,18 +300,18 @@ export class StreamingMessageHandler {
     try {
       // Parse the streaming chunk (format depends on LLM provider)
       const data = JSON.parse(chunk);
-      
+
       return {
-        content: data.content || '',
+        content: data.content || "",
         done: data.done || false,
-        messageId
+        messageId,
       };
     } catch (error) {
-      console.error('Error processing stream chunk:', error);
+      console.error("Error processing stream chunk:", error);
       return {
-        content: '',
+        content: "",
         done: true,
-        messageId
+        messageId,
       };
     }
   }
@@ -316,4 +328,5 @@ export class StreamingMessageHandler {
   }
 }
 
-export { MessageManager as default, StreamingMessageHandler };
+export { MessageManager as default };
+export { StreamingMessageHandler };

@@ -1,11 +1,13 @@
 // Core application types for modular architecture
 
+import { MessageRole, FileStatus } from '@prisma/client';
+
 export interface User {
   id: string;
-  name?: string;
+  name: string | null;
   email: string;
-  emailVerified?: Date;
-  image?: string;
+  emailVerified: Date | null;
+  image: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,11 +29,8 @@ export interface Message {
   createdAt: Date;
 }
 
-export enum MessageRole {
-  USER = 'USER',
-  ASSISTANT = 'ASSISTANT',
-  SYSTEM = 'SYSTEM'
-}
+// Export Prisma types for use in other modules
+export { MessageRole, FileStatus };
 
 export interface Document {
   id: string;
@@ -47,12 +46,6 @@ export interface Document {
   chunks?: DocumentChunk[];
 }
 
-export enum FileStatus {
-  PROCESSING = 'PROCESSING',
-  READY = 'READY',
-  ERROR = 'ERROR'
-}
-
 export interface DocumentChunk {
   id: string;
   documentId: string;
@@ -65,15 +58,15 @@ export interface DocumentChunk {
 export interface ExternalLink {
   id: string;
   url: string;
-  title?: string;
-  content?: string;
+  title: string | null;
+  content: string | null;
   userId: string;
   createdAt: Date;
   updatedAt: Date;
 }
 
 // API Response types
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -108,7 +101,7 @@ export interface ContextChunk {
   content: string;
   source: string;
   relevanceScore: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // LLM Gateway types

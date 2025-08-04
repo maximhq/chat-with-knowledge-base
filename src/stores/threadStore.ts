@@ -1,7 +1,7 @@
-import { create } from 'zustand';
-import { devtools, subscribeWithSelector } from 'zustand/middleware';
-import { immer } from 'zustand/middleware/immer';
-import type { Thread } from '@/types';
+import { create } from "zustand";
+import { devtools, subscribeWithSelector } from "zustand/middleware";
+import { immer } from "zustand/middleware/immer";
+import type { Thread } from "@/types";
 
 interface ThreadState {
   // State
@@ -9,7 +9,7 @@ interface ThreadState {
   selectedThreadId: string | null;
   isLoading: boolean;
   error: string | null;
-  
+
   // Actions
   setThreads: (threads: Thread[]) => void;
   addThread: (thread: Thread) => void;
@@ -18,7 +18,7 @@ interface ThreadState {
   selectThread: (threadId: string | null) => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
-  
+
   // Async actions
   fetchThreads: () => Promise<void>;
   createThread: (title?: string) => Promise<Thread | null>;
@@ -85,7 +85,7 @@ export const useThreadStore = create<ThreadState>()(
           });
 
           try {
-            const response = await fetch('/api/threads');
+            const response = await fetch("/api/threads");
             if (response.ok) {
               const data = await response.json();
               if (data.success) {
@@ -94,24 +94,25 @@ export const useThreadStore = create<ThreadState>()(
                   state.isLoading = false;
                 });
               } else {
-                throw new Error(data.error || 'Failed to fetch threads');
+                throw new Error(data.error || "Failed to fetch threads");
               }
             } else {
-              throw new Error('Failed to fetch threads');
+              throw new Error("Failed to fetch threads");
             }
           } catch (error) {
             set((state) => {
-              state.error = error instanceof Error ? error.message : 'Unknown error';
+              state.error =
+                error instanceof Error ? error.message : "Unknown error";
               state.isLoading = false;
             });
           }
         },
 
-        createThread: async (title = 'New Chat') => {
+        createThread: async (title = "New Chat") => {
           try {
-            const response = await fetch('/api/threads', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            const response = await fetch("/api/threads", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ title }),
             });
 
@@ -126,10 +127,13 @@ export const useThreadStore = create<ThreadState>()(
                 return newThread;
               }
             }
-            throw new Error('Failed to create thread');
+            throw new Error("Failed to create thread");
           } catch (error) {
             set((state) => {
-              state.error = error instanceof Error ? error.message : 'Failed to create thread';
+              state.error =
+                error instanceof Error
+                  ? error.message
+                  : "Failed to create thread";
             });
             return null;
           }
@@ -138,7 +142,7 @@ export const useThreadStore = create<ThreadState>()(
         removeThread: async (threadId) => {
           try {
             const response = await fetch(`/api/threads/${threadId}`, {
-              method: 'DELETE',
+              method: "DELETE",
             });
 
             if (response.ok) {
@@ -149,24 +153,28 @@ export const useThreadStore = create<ThreadState>()(
                 }
               });
             } else {
-              throw new Error('Failed to delete thread');
+              throw new Error("Failed to delete thread");
             }
           } catch (error) {
             set((state) => {
-              state.error = error instanceof Error ? error.message : 'Failed to delete thread';
+              state.error =
+                error instanceof Error
+                  ? error.message
+                  : "Failed to delete thread";
             });
           }
         },
       }))
     ),
-    { name: 'thread-store' }
+    { name: "thread-store" }
   )
 );
 
 // Selectors for optimized re-renders
 export const useSelectedThread = () =>
-  useThreadStore((state) => 
-    state.threads.find((t) => t.id === state.selectedThreadId) || null
+  useThreadStore(
+    (state) =>
+      state.threads.find((t) => t.id === state.selectedThreadId) || null
   );
 
 export const useThreadsCount = () =>
