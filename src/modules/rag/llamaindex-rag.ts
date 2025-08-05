@@ -3,14 +3,13 @@ import { QdrantVectorStore } from "@llamaindex/qdrant";
 import {
   VectorStoreIndex,
   storageContextFromDefaults,
-  Settings,
   MetadataMode,
   NodeWithScore,
   SimpleDirectoryReader,
 } from "llamaindex";
-import { OpenAI } from "llamaindex/llm/openai";
 import { OpenAIEmbedding } from "llamaindex/embeddings/OpenAIEmbedding";
 import { createId } from "@paralleldrive/cuid2";
+import { LLMGateway } from "../llm";
 
 export interface IndexingResult {
   success: boolean;
@@ -38,48 +37,42 @@ export interface GenerateResult {
  */
 export class LlamaIndexRAGManager {
   private vectorStore: QdrantVectorStore;
-  private vectorStoreIndex?: VectorStoreIndex;
   private collectionName: string;
   private qdrantUrl: string;
-  private llm: OpenAI;
+  private qdrantApiKey: string;
+  private bifrostUrl: string;
+  private bifrostKey: string;
   private embedModel: OpenAIEmbedding;
+  private llmGateway: LLMGateway;
 
   constructor() {
     this.collectionName =
       process.env.QDRANT_COLLECTION_NAME || "knowledge_base";
     this.qdrantUrl = process.env.QDRANT_URL || "http://localhost:6333";
-    const bifrostUrl = process.env.BIFROST_API_URL || "http://localhost:8080";
-    const bifrostKey = process.env.BIFROST_API_KEY || "";
+    this.qdrantApiKey = process.env.QDRANT_API_KEY || "";
+    this.bifrostUrl = process.env.BIFROST_API_URL || "http://localhost:8080";
+    this.bifrostKey = process.env.BIFROST_API_KEY || "";
 
-    // Create OpenAI LLM instance with Bifrost
-    this.llm = new OpenAI({
-      apiKey: bifrostKey,
-      model: "gpt-4o-mini",
-      additionalSessionOptions: {
-        baseURL: `${bifrostUrl}/openai`,
-      },
-    });
-
-    // Create OpenAI Embeddings instance with Bifrost
     this.embedModel = new OpenAIEmbedding({
-      apiKey: bifrostKey,
+      apiKey: process.env.BIFROST_API_KEY,
       model: "text-embedding-3-small",
       additionalSessionOptions: {
-        baseURL: `${bifrostUrl}/openai`,
+        baseURL: `${process.env.BIFROST_API_URL}/openai`,
       },
     });
 
-    // Initialize Qdrant vector store
+    // Initialize LLM Gateway for response generation
+    this.llmGateway = new LLMGateway({
+      apiUrl: this.bifrostUrl,
+      apiKey: this.bifrostKey,
+      timeout: 30000,
+    });
+
+    // Now create vector store - Settings.embedModel is available
     this.vectorStore = new QdrantVectorStore({
       url: this.qdrantUrl,
       collectionName: this.collectionName,
-    });
-
-    console.log(`LlamaIndex RAG Manager initialized with:`, {
-      qdrantUrl: this.qdrantUrl,
-      collectionName: this.collectionName,
-      bifrostUrl,
-      hasApiKey: !!bifrostKey,
+      embeddingModel: this.embedModel,
     });
   }
 
@@ -93,11 +86,11 @@ export class LlamaIndexRAGManager {
       name: string;
       size?: number;
       mimeType?: string;
-    }[],
+    }[]
   ): Promise<IndexingResult> {
     try {
       console.log(
-        `Indexing documents from directory ${directoryPath} for thread ${threadId}`,
+        `Indexing documents from directory ${directoryPath} for thread ${threadId}`
       );
 
       // Load documents from directory using SimpleDirectoryReader
@@ -136,21 +129,15 @@ export class LlamaIndexRAGManager {
         };
       });
 
-      // Create storage context with Qdrant vector store
       const storageContext = await storageContextFromDefaults({
         vectorStore: this.vectorStore,
       });
 
-      // Create indices in Qdrant - LlamaIndex handles everything
+      // Create indices in Qdrant
       console.log("Creating VectorStoreIndex with documents...");
-      this.vectorStoreIndex = await Settings.withEmbedModel(
-        this.embedModel,
-        async () => {
-          return await VectorStoreIndex.fromDocuments(documents, {
-            storageContext,
-          });
-        },
-      );
+      await VectorStoreIndex.fromDocuments(documents, {
+        storageContext,
+      });
 
       console.log("Successfully created VectorStoreIndex");
 
@@ -172,7 +159,7 @@ export class LlamaIndexRAGManager {
       }
 
       console.log(
-        `Created ${documentRecords.length} document records in MySQL`,
+        `Created ${documentRecords.length} document records in MySQL`
       );
 
       return {
@@ -192,147 +179,47 @@ export class LlamaIndexRAGManager {
   }
 
   /**
-   * Retrieve context using LlamaIndex's query engine with filters
-   */
-  async retrieveContext(
-    query: string,
-    threadId: string,
-  ): Promise<RetrievalResult> {
-    try {
-      if (!this.vectorStoreIndex) {
-        // Try to load existing index from storage
-        const storageContext = await storageContextFromDefaults({
-          vectorStore: this.vectorStore,
-        });
-        this.vectorStoreIndex = await Settings.withEmbedModel(
-          this.embedModel,
-          async () => {
-            return await VectorStoreIndex.init({
-              storageContext,
-            });
-          },
-        );
-      }
-
-      console.log(
-        `Retrieving context for query: "${query.substring(0, 100)}..."`,
-      );
-
-      // Execute query with scoped embedding model
-      const response = await Settings.withEmbedModel(
-        this.embedModel,
-        async () => {
-          // Create query engine with threadId filter
-          const queryEngine = this.vectorStoreIndex!.asQueryEngine({
-            preFilters: {
-              filters: [
-                {
-                  key: "threadId",
-                  value: threadId,
-                  operator: "==",
-                },
-              ],
-            },
-            similarityTopK: 5, // Retrieve top 5 similar chunks
-          });
-
-          // Execute the query
-          return await queryEngine.query({
-            query,
-          });
-        },
-      );
-
-      // Extract source nodes for building context
-      const sourceNodes = response.sourceNodes || [];
-
-      // Build context text from source nodes
-      const contextText = sourceNodes
-        .map(
-          (node: NodeWithScore, index: number) =>
-            `[${index + 1}] ${node.node.getContent(MetadataMode.NONE)}`,
-        )
-        .join("\n\n");
-
-      // Extract sources with metadata
-      const sources = sourceNodes.map((node: NodeWithScore) => ({
-        fileName: (node.node.metadata?.fileName as string) || "Unknown",
-        similarity: node.score || 0,
-      }));
-
-      console.log(`Retrieved ${sourceNodes.length} relevant chunks`);
-
-      return {
-        contextText,
-        sources,
-      };
-    } catch (error) {
-      console.error("Failed to retrieve context:", error);
-      throw new Error(`Context retrieval failed: ${error}`);
-    }
-  }
-
-  /**
    * Generate response using LlamaIndex's query engine
    */
   async generateResponse(
     query: string,
-    threadId: string,
+    threadId: string
   ): Promise<GenerateResult> {
     try {
-      if (!this.vectorStoreIndex) {
-        // Try to load existing index from storage
-        const storageContext = await storageContextFromDefaults({
-          vectorStore: this.vectorStore,
-        });
-        this.vectorStoreIndex = await Settings.withEmbedModel(
-          this.embedModel,
-          async () => {
-            return await VectorStoreIndex.init({
-              storageContext,
-            });
-          },
-        );
-      }
-
-      console.log(
-        `Generating response for query: "${query.substring(0, 100)}..."`,
+      const vectorStoreIndex = await VectorStoreIndex.fromVectorStore(
+        this.vectorStore
       );
 
-      // Generate response with scoped models
-      const response = await Settings.withLLM(this.llm, async () => {
-        return await Settings.withEmbedModel(this.embedModel, async () => {
-          // Create query engine with threadId filter
-          const queryEngine = this.vectorStoreIndex!.asQueryEngine({
-            preFilters: {
-              filters: [
-                {
-                  key: "threadId",
-                  value: threadId,
-                  operator: "==",
-                },
-              ],
-            },
-            similarityTopK: 5,
-          });
+      console.log(
+        `Generating response for query: "${query.substring(0, 100)}..."`
+      );
 
-          // Execute the query - LlamaIndex handles context retrieval and response generation
-          return await queryEngine.query({
-            query,
-          });
-        });
+      // Create retriever with threadId filter for context retrieval only
+      const retriever = vectorStoreIndex.asRetriever({
+        filters: {
+          filters: [
+            {
+              key: "threadId",
+              value: threadId,
+              operator: "==",
+            },
+          ],
+        },
+        similarityTopK: 5,
       });
 
-      // Extract context information for the response
-      const sourceNodes = response.sourceNodes || [];
-      const contextText = sourceNodes
+      // Retrieve relevant context
+      const retrievedNodes = await retriever.retrieve(query);
+
+      // Extract context information
+      const contextText = retrievedNodes
         .map(
           (node: NodeWithScore, index: number) =>
-            `[${index + 1}] ${node.node.getContent(MetadataMode.NONE)}`,
+            `[${index + 1}] ${node.node.getContent(MetadataMode.NONE)}`
         )
         .join("\n\n");
 
-      const sources = sourceNodes.map((node: NodeWithScore) => ({
+      const sources = retrievedNodes.map((node: NodeWithScore) => ({
         fileName: (node.node.metadata?.fileName as string) || "Unknown",
         similarity: node.score || 0,
       }));
@@ -342,12 +229,30 @@ export class LlamaIndexRAGManager {
         sources,
       };
 
-      console.log(
-        `Generated response with ${sourceNodes.length} source chunks`,
-      );
+      // Use LLMGateway to generate response using the retrieved context
+      const llmResponse = await this.llmGateway.chatCompletion({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a helpful assistant that answers questions based on the provided context. Use the context below to answer the user's question. If the context doesn't contain relevant information, say so clearly.\n\nContext:\n${contextText}`,
+          },
+          {
+            role: "user",
+            content: query,
+          },
+        ],
+      });
+
+      if (!llmResponse.success) {
+        throw new Error(`LLM API error: ${llmResponse.error}`);
+      }
+
+      const generatedResponse =
+        llmResponse.data?.content || "No response generated";
 
       return {
-        response: response.toString(),
+        response: generatedResponse,
         context,
       };
     } catch (error) {
@@ -361,7 +266,7 @@ export class LlamaIndexRAGManager {
    */
   async deleteDocumentsByFilename(
     filename: string,
-    threadId: string,
+    threadId: string
   ): Promise<{
     success: boolean;
     deletedCount: number;
@@ -369,7 +274,7 @@ export class LlamaIndexRAGManager {
   }> {
     try {
       console.log(
-        `Deleting documents for filename: ${filename} in thread: ${threadId}`,
+        `Deleting documents for filename: ${filename} in thread: ${threadId}`
       );
 
       // First, find all document records to get the doc_ids
@@ -392,8 +297,6 @@ export class LlamaIndexRAGManager {
       // Note: QdrantVectorStore.delete() only accepts refDocId string parameter
       // We'll use the Qdrant client directly to delete by filter
       try {
-        // Use the Qdrant client directly to delete by metadata filter
-        // This is a workaround until LlamaIndex supports metadata-based deletion
         const client = this.vectorStore.client();
         await client.delete(this.collectionName, {
           filter: {
@@ -414,33 +317,24 @@ export class LlamaIndexRAGManager {
           },
         });
         console.log(
-          `Successfully deleted vector embeddings for ${filename} in thread ${threadId}`,
+          `Successfully deleted vector embeddings for ${filename} in thread ${threadId}`
         );
       } catch (vectorError) {
         console.warn(
           `Failed to delete from vector store for ${filename}:`,
-          vectorError,
+          vectorError
         );
-        // Continue with MySQL deletion even if vector deletion fails
       }
-
-      // Delete from MySQL database
-      const deletedDocuments = await prisma.document.deleteMany({
-        where: {
-          filename: filename,
-          threadId: threadId,
-        },
-      });
 
       return {
         success: true,
-        deletedCount: deletedDocuments.count,
-        message: `Successfully deleted ${deletedDocuments.count} documents for file: ${filename} from both database and vector store`,
+        deletedCount: documents.length,
+        message: `Successfully deleted ${documents.length} documents for file: ${filename} from both database and vector store`,
       };
     } catch (error) {
       console.error(
         `Failed to delete documents for filename ${filename} in thread ${threadId}:`,
-        error,
+        error
       );
       return {
         success: false,

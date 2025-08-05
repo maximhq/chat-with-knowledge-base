@@ -12,7 +12,6 @@ interface FileUploadDropzoneProps {
   maxFiles?: number;
   maxSize?: number;
   acceptedTypes?: string[];
-  autoIndex?: boolean; // Automatically index files after upload
 }
 
 interface UploadResult {
@@ -65,7 +64,6 @@ export function FileUploadDropzone({
     "application/msgpack",
     "application/x-msgpack",
   ],
-  autoIndex = true,
 }: FileUploadDropzoneProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -76,22 +74,19 @@ export function FileUploadDropzone({
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       setSelectedFiles((prev) =>
-        [...prev, ...acceptedFiles].slice(0, maxFiles),
+        [...prev, ...acceptedFiles].slice(0, maxFiles)
       );
     },
-    [maxFiles],
+    [maxFiles]
   );
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } =
     useDropzone({
       onDrop,
-      accept: acceptedTypes.reduce(
-        (acc, type) => {
-          acc[type] = [];
-          return acc;
-        },
-        {} as Record<string, string[]>,
-      ),
+      accept: acceptedTypes.reduce((acc, type) => {
+        acc[type] = [];
+        return acc;
+      }, {} as Record<string, string[]>),
       maxSize,
       maxFiles,
       multiple: true,
@@ -111,64 +106,41 @@ export function FileUploadDropzone({
       // First, call the original onFilesSelected callback
       onFilesSelected(selectedFiles);
 
-      // If autoIndex is enabled, process files through RAG pipeline
-      if (autoIndex) {
-        for (const file of selectedFiles) {
-          try {
-            // Create FormData for file upload
-            const formData = new FormData();
-            formData.append("file", file);
-            if (selectedThreadId) {
-              formData.append("threadId", selectedThreadId);
-            }
-
-            // Upload file to server
-            const uploadResponse = await fetch("/api/documents/upload", {
-              method: "POST",
-              body: formData,
-            });
-
-            if (!uploadResponse.ok) {
-              throw new Error(`Upload failed: ${uploadResponse.statusText}`);
-            }
-
-            const uploadData = await uploadResponse.json();
-            const filePath = uploadData.filePath;
-
-            // Index the document
-            const indexResponse = await fetch("/api/documents/index", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                filePath,
-                fileName: file.name,
-                threadId: selectedThreadId,
-              }),
-            });
-
-            if (!indexResponse.ok) {
-              throw new Error(`Indexing failed: ${indexResponse.statusText}`);
-            }
-
-            const indexData = await indexResponse.json();
-
-            results.push({
-              fileName: file.name,
-              success: true,
-              documentId: indexData.documentId,
-              chunksProcessed: indexData.chunksProcessed,
-            });
-          } catch (error) {
-            console.error(`Failed to process file ${file.name}:`, error);
-            results.push({
-              fileName: file.name,
-              success: false,
-              error: error instanceof Error ? error.message : "Unknown error",
-              file: file, // Store file for retry
-            });
+      for (const file of selectedFiles) {
+        try {
+          // Create FormData for file upload
+          const formData = new FormData();
+          formData.append("file", file);
+          if (selectedThreadId) {
+            formData.append("threadId", selectedThreadId);
           }
+
+          // Upload file to server
+          const uploadResponse = await fetch("/api/documents/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+          }
+
+          const uploadData = await uploadResponse.json();
+
+          results.push({
+            fileName: file.name,
+            success: true,
+            documentId: uploadData.documentId,
+            chunksProcessed: uploadData.chunksProcessed,
+          });
+        } catch (error) {
+          console.error(`Failed to process file ${file.name}:`, error);
+          results.push({
+            fileName: file.name,
+            success: false,
+            error: error instanceof Error ? error.message : "Unknown error",
+            file: file, // Store file for retry
+          });
         }
       }
 
@@ -185,12 +157,12 @@ export function FileUploadDropzone({
   const retryFailedUpload = async (fileName: string) => {
     // Find the original file from the failed upload
     const failedResult = uploadResults.find(
-      (result) => result.fileName === fileName && !result.success,
+      (result) => result.fileName === fileName && !result.success
     );
 
     if (!failedResult || !failedResult.file) {
       alert(
-        `Cannot retry upload for "${fileName}". Please re-select the file and upload again.`,
+        `Cannot retry upload for "${fileName}". Please re-select the file and upload again.`
       );
       return;
     }
@@ -215,62 +187,26 @@ export function FileUploadDropzone({
       }
 
       const uploadData = await uploadResponse.json();
-      const filePath = uploadData.filePath;
 
-      if (autoIndex) {
-        // Index the document
-        const indexResponse = await fetch("/api/documents/index", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            filePath,
-            fileName: file.name,
-            threadId: selectedThreadId,
-          }),
-        });
-
-        if (!indexResponse.ok) {
-          throw new Error(`Indexing failed: ${indexResponse.statusText}`);
-        }
-
-        const indexData = await indexResponse.json();
-
-        // Update the result to success
-        setUploadResults((prev) =>
-          prev.map((result) =>
-            result.fileName === fileName
-              ? {
-                  fileName: file.name,
-                  success: true,
-                  documentId: indexData.documentId,
-                  chunksProcessed: indexData.chunksProcessed,
-                }
-              : result,
-          ),
-        );
-      } else {
-        // Just mark as uploaded successfully
-        setUploadResults((prev) =>
-          prev.map((result) =>
-            result.fileName === fileName
-              ? {
-                  fileName: file.name,
-                  success: true,
-                  documentId: uploadData.documentId,
-                  chunksProcessed: 0,
-                }
-              : result,
-          ),
-        );
-      }
+      // Update the result to success
+      setUploadResults((prev) =>
+        prev.map((result) =>
+          result.fileName === fileName
+            ? {
+                fileName: file.name,
+                success: true,
+                documentId: uploadData.documentId,
+                chunksProcessed: uploadData.chunksProcessed,
+              }
+            : result
+        )
+      );
 
       // Call the upload complete callback
       onUploadComplete?.(
         uploadResults.map((result) =>
-          result.fileName === fileName ? { ...result, success: true } : result,
-        ),
+          result.fileName === fileName ? { ...result, success: true } : result
+        )
       );
     } catch (error) {
       console.error(`Failed to retry upload for ${fileName}:`, error);
@@ -283,8 +219,8 @@ export function FileUploadDropzone({
                 ...result,
                 error: error instanceof Error ? error.message : "Retry failed",
               }
-            : result,
-        ),
+            : result
+        )
       );
     } finally {
       setRetryingFiles((prev) => {
@@ -400,9 +336,9 @@ export function FileUploadDropzone({
                   Processing...
                 </>
               ) : (
-                `${autoIndex ? "Upload & Index" : "Upload"} ${
-                  selectedFiles.length
-                } file${selectedFiles.length !== 1 ? "s" : ""}`
+                `Upload & Index ${selectedFiles.length} file${
+                  selectedFiles.length !== 1 ? "s" : ""
+                }`
               )}
             </Button>
           </div>

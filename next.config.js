@@ -10,7 +10,7 @@ const nextConfig = {
   },
 
   // Enable server components
-  serverExternalPackages: ["@prisma/client"],
+  serverExternalPackages: ["@prisma/client", "llamaindex"],
 
   // Headers for security
   async headers() {
