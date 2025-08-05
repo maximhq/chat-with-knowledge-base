@@ -17,6 +17,7 @@ import {
 import { useThreadStore, useUIStore, useActiveTab } from "@/stores";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { Settings } from "lucide-react";
 
 interface MainLayoutProps {
   threadId?: string;
@@ -142,6 +143,11 @@ export function MainLayout({ threadId }: MainLayoutProps) {
                       </p>
                     </div>
                   </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => router.push("/settings")}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut()}>
                     Sign out

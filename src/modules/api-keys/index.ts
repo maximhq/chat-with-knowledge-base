@@ -1,7 +1,6 @@
 import { prisma } from "../storage";
 import { createHash, randomBytes } from "crypto";
 import { createId } from "@paralleldrive/cuid2";
-import { Prisma } from "@prisma/client";
 
 export interface ApiKeyData {
   id: string;
@@ -10,7 +9,6 @@ export interface ApiKeyData {
   userId: string;
   isActive: boolean;
   lastUsedAt: Date | null;
-  expiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -18,8 +16,6 @@ export interface ApiKeyData {
 export interface CreateApiKeyRequest {
   name: string;
   userId: string;
-  expiresAt?: Date;
-  permissions?: Record<string, unknown>;
 }
 
 export interface CreateApiKeyResponse {
@@ -64,9 +60,6 @@ export class ApiKeyManager {
         keyPrefix: prefix,
         userId: request.userId,
         isActive: true,
-        expiresAt: request.expiresAt || null,
-        permissions:
-          request.permissions as unknown as Prisma.NullableJsonNullValueInput,
       },
     });
 
@@ -79,7 +72,6 @@ export class ApiKeyManager {
         userId: apiKeyRecord.userId,
         isActive: apiKeyRecord.isActive,
         lastUsedAt: apiKeyRecord.lastUsedAt,
-        expiresAt: apiKeyRecord.expiresAt,
         createdAt: apiKeyRecord.createdAt,
         updatedAt: apiKeyRecord.updatedAt,
       },
@@ -109,11 +101,6 @@ export class ApiKeyManager {
       });
 
       if (!apiKeyRecord || !apiKeyRecord.isActive) {
-        return null;
-      }
-
-      // Check expiration
-      if (apiKeyRecord.expiresAt && apiKeyRecord.expiresAt < new Date()) {
         return null;
       }
 
@@ -154,7 +141,6 @@ export class ApiKeyManager {
       userId: key.userId,
       isActive: key.isActive,
       lastUsedAt: key.lastUsedAt,
-      expiresAt: key.expiresAt,
       createdAt: key.createdAt,
       updatedAt: key.updatedAt,
     }));

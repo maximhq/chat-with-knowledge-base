@@ -1,18 +1,11 @@
 import { NextRequest } from "next/server";
 import { ApiKeyManager } from "@/modules/api-keys";
-import {
-  withApiMiddleware,
-  schemas,
-  rateLimits,
-  ApiUtils,
-} from "@/modules/api";
+import { withApiMiddleware, rateLimits, ApiUtils } from "@/modules/api";
 import { z } from "zod";
 
 // Schema for creating API keys
 const createApiKeySchema = z.object({
   name: z.string().min(1).max(100),
-  expiresAt: z.string().datetime().optional(),
-  permissions: z.record(z.unknown()).optional(),
 });
 
 // GET /api/api-keys - List user's API keys
@@ -46,13 +39,11 @@ export const POST = withApiMiddleware(
   },
   async (request: NextRequest, { userId, data }) => {
     try {
-      const { name, expiresAt, permissions } = data!;
+      const { name } = data!;
 
       const result = await ApiKeyManager.createApiKey({
         name,
         userId: userId!,
-        expiresAt: expiresAt ? new Date(expiresAt) : undefined,
-        permissions,
       });
 
       return ApiUtils.createResponse({
