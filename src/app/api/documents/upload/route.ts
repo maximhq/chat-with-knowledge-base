@@ -4,12 +4,11 @@ import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { ThreadStorage } from "@/modules/storage";
 import { createRAGManager } from "@/modules/rag";
-import { withApiMiddleware, rateLimits, ApiUtils } from "@/modules/api";
+import { withApiMiddleware, ApiUtils } from "@/modules/api";
 
 export const POST = withApiMiddleware(
   {
     auth: true,
-    rateLimit: rateLimits.upload,
   },
   async (request: NextRequest, { userId }) => {
     let tempDirectoryPath: string | null = null;

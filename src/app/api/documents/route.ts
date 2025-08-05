@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/modules/storage";
-import { withApiMiddleware, rateLimits, ApiUtils } from "@/modules/api";
+import { withApiMiddleware, ApiUtils } from "@/modules/api";
 
 export const GET = withApiMiddleware(
-  { auth: true, rateLimit: rateLimits.default },
+  { auth: true },
   async (request: NextRequest, { userId }) => {
     try {
       const { searchParams } = new URL(request.url);

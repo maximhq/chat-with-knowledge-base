@@ -94,7 +94,7 @@ export class LLMGateway {
     request: LLMRequest,
     onChunk: (chunk: string) => void,
     onComplete: () => void,
-    onError: (error: Error) => void
+    onError: (error: Error) => void,
   ): Promise<void> {
     try {
       // Convert our message format to OpenAI SDK format
@@ -124,7 +124,7 @@ export class LLMGateway {
     } catch (error) {
       console.error("Streaming chat completion error:", error);
       onError(
-        error instanceof Error ? error : new Error("Unknown streaming error")
+        error instanceof Error ? error : new Error("Unknown streaming error"),
       );
     }
   }
@@ -135,7 +135,7 @@ export class LLMGateway {
   async generateEmbeddings(texts: string[]): Promise<ApiResponse<number[][]>> {
     try {
       console.log(
-        `Generating embeddings for ${texts.length} texts using Bifrost`
+        `Generating embeddings for ${texts.length} texts using Bifrost`,
       );
       console.log(`Bifrost baseURL: ${this.openai.baseURL}`);
       console.log(`First text sample: "${texts[0]?.substring(0, 100)}..."`);
@@ -158,13 +158,13 @@ export class LLMGateway {
         if (isAllZeros) {
           console.error(`Warning: Embedding ${i} is all zeros!`);
           throw new Error(
-            `Generated embedding ${i} contains all zeros - this indicates an API issue`
+            `Generated embedding ${i} contains all zeros - this indicates an API issue`,
           );
         }
       }
 
       console.log(
-        `Successfully generated ${embeddings.length} valid embeddings`
+        `Successfully generated ${embeddings.length} valid embeddings`,
       );
 
       return {
@@ -247,13 +247,13 @@ export class ChatService {
       temperature?: number;
       maxTokens?: number;
       stream?: boolean;
-    }
+    },
   ): Promise<ApiResponse<LLMResponse>> {
     try {
       // Prepare messages with context
       const processedMessages = this.prepareMessagesWithContext(
         messages,
-        context
+        context,
       );
 
       const request: LLMRequest = {
@@ -279,7 +279,7 @@ export class ChatService {
    */
   private prepareMessagesWithContext(
     messages: Array<{ role: string; content: string }>,
-    context?: ContextChunk[]
+    context?: ContextChunk[],
   ): Array<{ role: string; content: string }> {
     if (!context || context.length === 0) {
       return messages;
@@ -289,7 +289,7 @@ export class ChatService {
     const contextText = context
       .map(
         (chunk, index) =>
-          `[Source ${index + 1}] ${chunk.source}:\n${chunk.content}`
+          `[Source ${index + 1}] ${chunk.source}:\n${chunk.content}`,
       )
       .join("\n\n");
 

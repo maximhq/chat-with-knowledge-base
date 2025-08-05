@@ -1,16 +1,11 @@
 // API routes for individual thread operations
 import { NextRequest } from "next/server";
 import { ThreadManager } from "@/modules/threads";
-import {
-  withApiMiddleware,
-  schemas,
-  rateLimits,
-  ApiUtils,
-} from "@/modules/api";
+import { withApiMiddleware, schemas, ApiUtils } from "@/modules/api";
 
 // GET /api/threads/[id] - Get specific thread
 export const GET = withApiMiddleware(
-  { auth: true, rateLimit: rateLimits.default },
+  { auth: true },
   async (request: NextRequest, { userId }) => {
     const url = new URL(request.url);
     const threadId = url.pathname.split("/").pop();
@@ -28,7 +23,6 @@ export const GET = withApiMiddleware(
 export const PUT = withApiMiddleware(
   {
     auth: true,
-    rateLimit: rateLimits.default,
     validation: schemas.updateThread,
   },
   async (request: NextRequest, { userId, data }) => {
@@ -50,7 +44,7 @@ export const PUT = withApiMiddleware(
 
 // DELETE /api/threads/[id] - Delete thread
 export const DELETE = withApiMiddleware(
-  { auth: true, rateLimit: rateLimits.default },
+  { auth: true },
   async (request: NextRequest, { userId }) => {
     const url = new URL(request.url);
     const threadId = url.pathname.split("/").pop();

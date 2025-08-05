@@ -1,16 +1,11 @@
 // API routes for thread management
 import { NextRequest } from "next/server";
 import { ThreadManager } from "@/modules/threads";
-import {
-  withApiMiddleware,
-  schemas,
-  rateLimits,
-  ApiUtils,
-} from "@/modules/api";
+import { withApiMiddleware, schemas, ApiUtils } from "@/modules/api";
 
 // GET /api/threads - Get all threads for authenticated user
 export const GET = withApiMiddleware(
-  { auth: true, rateLimit: rateLimits.default },
+  { auth: true },
   async (request: NextRequest, { userId }) => {
     const result = await ThreadManager.getUserThreads(userId!);
     return ApiUtils.createResponse(result);
@@ -21,7 +16,6 @@ export const GET = withApiMiddleware(
 export const POST = withApiMiddleware(
   {
     auth: true,
-    rateLimit: rateLimits.default,
     validation: schemas.createThread,
   },
   async (request: NextRequest, { userId, data }) => {

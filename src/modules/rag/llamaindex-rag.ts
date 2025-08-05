@@ -86,11 +86,11 @@ export class LlamaIndexRAGManager {
       name: string;
       size?: number;
       mimeType?: string;
-    }[]
+    }[],
   ): Promise<IndexingResult> {
     try {
       console.log(
-        `Indexing documents from directory ${directoryPath} for thread ${threadId}`
+        `Indexing documents from directory ${directoryPath} for thread ${threadId}`,
       );
 
       // Load documents from directory using SimpleDirectoryReader
@@ -159,7 +159,7 @@ export class LlamaIndexRAGManager {
       }
 
       console.log(
-        `Created ${documentRecords.length} document records in MySQL`
+        `Created ${documentRecords.length} document records in MySQL`,
       );
 
       return {
@@ -183,15 +183,15 @@ export class LlamaIndexRAGManager {
    */
   async generateResponse(
     query: string,
-    threadId: string
+    threadId: string,
   ): Promise<GenerateResult> {
     try {
       const vectorStoreIndex = await VectorStoreIndex.fromVectorStore(
-        this.vectorStore
+        this.vectorStore,
       );
 
       console.log(
-        `Generating response for query: "${query.substring(0, 100)}..."`
+        `Generating response for query: "${query.substring(0, 100)}..."`,
       );
 
       // Create retriever with threadId filter for context retrieval only
@@ -215,7 +215,7 @@ export class LlamaIndexRAGManager {
       const contextText = retrievedNodes
         .map(
           (node: NodeWithScore, index: number) =>
-            `[${index + 1}] ${node.node.getContent(MetadataMode.NONE)}`
+            `[${index + 1}] ${node.node.getContent(MetadataMode.NONE)}`,
         )
         .join("\n\n");
 
@@ -266,7 +266,7 @@ export class LlamaIndexRAGManager {
    */
   async deleteDocumentsByFilename(
     filename: string,
-    threadId: string
+    threadId: string,
   ): Promise<{
     success: boolean;
     deletedCount: number;
@@ -274,7 +274,7 @@ export class LlamaIndexRAGManager {
   }> {
     try {
       console.log(
-        `Deleting documents for filename: ${filename} in thread: ${threadId}`
+        `Deleting documents for filename: ${filename} in thread: ${threadId}`,
       );
 
       // First, find all document records to get the doc_ids
@@ -317,12 +317,12 @@ export class LlamaIndexRAGManager {
           },
         });
         console.log(
-          `Successfully deleted vector embeddings for ${filename} in thread ${threadId}`
+          `Successfully deleted vector embeddings for ${filename} in thread ${threadId}`,
         );
       } catch (vectorError) {
         console.warn(
           `Failed to delete from vector store for ${filename}:`,
-          vectorError
+          vectorError,
         );
       }
 
@@ -334,7 +334,7 @@ export class LlamaIndexRAGManager {
     } catch (error) {
       console.error(
         `Failed to delete documents for filename ${filename} in thread ${threadId}:`,
-        error
+        error,
       );
       return {
         success: false,

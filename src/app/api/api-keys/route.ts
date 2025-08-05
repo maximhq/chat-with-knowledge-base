@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { ApiKeyManager } from "@/modules/api-keys";
-import { withApiMiddleware, rateLimits, ApiUtils } from "@/modules/api";
+import { withApiMiddleware, ApiUtils } from "@/modules/api";
 import { z } from "zod";
 
 // Schema for creating API keys
@@ -12,7 +12,6 @@ const createApiKeySchema = z.object({
 export const GET = withApiMiddleware(
   {
     auth: true,
-    rateLimit: rateLimits.default,
   },
   async (request: NextRequest, { userId }) => {
     try {
@@ -34,7 +33,6 @@ export const GET = withApiMiddleware(
 export const POST = withApiMiddleware(
   {
     auth: true,
-    rateLimit: rateLimits.auth,
     validation: createApiKeySchema,
   },
   async (request: NextRequest, { userId, data }) => {

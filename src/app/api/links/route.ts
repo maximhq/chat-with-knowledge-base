@@ -1,16 +1,11 @@
 // API routes for external link management
 import { NextRequest } from "next/server";
 import { ExternalLinkStorage } from "@/modules/storage";
-import {
-  withApiMiddleware,
-  schemas,
-  rateLimits,
-  ApiUtils,
-} from "@/modules/api";
+import { withApiMiddleware, schemas, ApiUtils } from "@/modules/api";
 
 // GET /api/links - Get all links for authenticated user
 export const GET = withApiMiddleware(
-  { auth: true, rateLimit: rateLimits.default },
+  { auth: true },
   async (request: NextRequest, { userId }) => {
     try {
       const links = await ExternalLinkStorage.findByUserId(userId!);
@@ -30,7 +25,6 @@ export const GET = withApiMiddleware(
 export const POST = withApiMiddleware(
   {
     auth: true,
-    rateLimit: rateLimits.default,
     validation: schemas.createLink,
   },
   async (request: NextRequest, { userId, data }) => {

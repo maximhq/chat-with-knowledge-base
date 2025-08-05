@@ -1,12 +1,11 @@
 import { NextRequest } from "next/server";
 import { ApiKeyManager } from "@/modules/api-keys";
-import { withApiMiddleware, rateLimits, ApiUtils } from "@/modules/api";
+import { withApiMiddleware, ApiUtils } from "@/modules/api";
 
 // DELETE /api/api-keys/[id] - Revoke/delete an API key
 export const DELETE = withApiMiddleware(
   {
     auth: true,
-    rateLimit: rateLimits.auth,
   },
   async (request: NextRequest, { userId }) => {
     try {

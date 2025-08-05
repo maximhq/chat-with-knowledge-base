@@ -1,11 +1,11 @@
 // API routes for thread messages
 import { NextRequest } from "next/server";
 import { MessageManager } from "@/modules/messages";
-import { withApiMiddleware, rateLimits, ApiUtils } from "@/modules/api";
+import { withApiMiddleware, ApiUtils } from "@/modules/api";
 
 // GET /api/threads/[id]/messages - Get messages for a thread
 export const GET = withApiMiddleware(
-  { auth: true, rateLimit: rateLimits.default },
+  { auth: true },
   async (request: NextRequest, { userId }) => {
     const url = new URL(request.url);
     const pathParts = url.pathname.split("/");
@@ -22,7 +22,7 @@ export const GET = withApiMiddleware(
 
 // POST /api/threads/[id]/messages - Send a message to a thread
 export const POST = withApiMiddleware(
-  { auth: true, rateLimit: rateLimits.chat },
+  { auth: true },
   async (request: NextRequest, { userId }) => {
     const url = new URL(request.url);
     const pathParts = url.pathname.split("/");

@@ -18,12 +18,12 @@ interface MessageState {
   updateMessage: (
     threadId: string,
     messageId: string,
-    updates: Partial<Message>
+    updates: Partial<Message>,
   ) => void;
   appendToMessage: (
     threadId: string,
     messageId: string,
-    content: string
+    content: string,
   ) => void;
   clearMessages: (threadId: string) => void;
   setLoading: (loading: boolean) => void;
@@ -204,10 +204,10 @@ export const useMessageStore = create<MessageState>()(
             });
           }
         },
-      }))
+      })),
     ),
-    { name: "message-store" }
-  )
+    { name: "message-store" },
+  ),
 );
 
 // Empty array constant to prevent re-renders
@@ -222,5 +222,5 @@ export const useThreadMessages = (threadId: string | null) =>
 
 export const useIsStreamingForThread = (threadId: string | null) =>
   useMessageStore(
-    (state) => state.isStreaming && state.streamingThreadId === threadId
+    (state) => state.isStreaming && state.streamingThreadId === threadId,
   );

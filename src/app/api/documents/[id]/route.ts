@@ -1,12 +1,12 @@
 // API routes for individual document operations
 import { NextRequest } from "next/server";
 import { DocumentStorage } from "@/modules/storage";
-import { withApiMiddleware, rateLimits, ApiUtils } from "@/modules/api";
+import { withApiMiddleware, ApiUtils } from "@/modules/api";
 import { createRAGManager } from "@/modules/rag";
 
 // DELETE /api/documents/[id] - Delete document from both MySQL and Qdrant
 export const DELETE = withApiMiddleware(
-  { auth: true, rateLimit: rateLimits.default },
+  { auth: true },
   async (request: NextRequest, { userId }) => {
     const url = new URL(request.url);
     const documentId = url.pathname.split("/").pop();

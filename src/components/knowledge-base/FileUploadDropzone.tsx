@@ -74,19 +74,22 @@ export function FileUploadDropzone({
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       setSelectedFiles((prev) =>
-        [...prev, ...acceptedFiles].slice(0, maxFiles)
+        [...prev, ...acceptedFiles].slice(0, maxFiles),
       );
     },
-    [maxFiles]
+    [maxFiles],
   );
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } =
     useDropzone({
       onDrop,
-      accept: acceptedTypes.reduce((acc, type) => {
-        acc[type] = [];
-        return acc;
-      }, {} as Record<string, string[]>),
+      accept: acceptedTypes.reduce(
+        (acc, type) => {
+          acc[type] = [];
+          return acc;
+        },
+        {} as Record<string, string[]>,
+      ),
       maxSize,
       maxFiles,
       multiple: true,
@@ -157,12 +160,12 @@ export function FileUploadDropzone({
   const retryFailedUpload = async (fileName: string) => {
     // Find the original file from the failed upload
     const failedResult = uploadResults.find(
-      (result) => result.fileName === fileName && !result.success
+      (result) => result.fileName === fileName && !result.success,
     );
 
     if (!failedResult || !failedResult.file) {
       alert(
-        `Cannot retry upload for "${fileName}". Please re-select the file and upload again.`
+        `Cannot retry upload for "${fileName}". Please re-select the file and upload again.`,
       );
       return;
     }
@@ -198,15 +201,15 @@ export function FileUploadDropzone({
                 documentId: uploadData.documentId,
                 chunksProcessed: uploadData.chunksProcessed,
               }
-            : result
-        )
+            : result,
+        ),
       );
 
       // Call the upload complete callback
       onUploadComplete?.(
         uploadResults.map((result) =>
-          result.fileName === fileName ? { ...result, success: true } : result
-        )
+          result.fileName === fileName ? { ...result, success: true } : result,
+        ),
       );
     } catch (error) {
       console.error(`Failed to retry upload for ${fileName}:`, error);
@@ -219,8 +222,8 @@ export function FileUploadDropzone({
                 ...result,
                 error: error instanceof Error ? error.message : "Retry failed",
               }
-            : result
-        )
+            : result,
+        ),
       );
     } finally {
       setRetryingFiles((prev) => {
