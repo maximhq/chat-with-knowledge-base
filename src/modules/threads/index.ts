@@ -8,7 +8,7 @@ export class ThreadManager {
    */
   static async createThread(
     userId: string,
-    title: string = "New Chat"
+    title: string = "New Chat",
   ): Promise<ApiResponse<Thread>> {
     try {
       const thread = await ThreadStorage.create({
@@ -56,7 +56,7 @@ export class ThreadManager {
    */
   static async getThread(
     threadId: string,
-    userId: string
+    userId: string,
   ): Promise<ApiResponse<Thread>> {
     try {
       const thread = await ThreadStorage.findById(threadId);
@@ -96,7 +96,7 @@ export class ThreadManager {
   static async updateThreadTitle(
     threadId: string,
     userId: string,
-    title: string
+    title: string,
   ): Promise<ApiResponse<Thread>> {
     try {
       // First verify ownership
@@ -137,7 +137,7 @@ export class ThreadManager {
    */
   static async deleteThread(
     threadId: string,
-    userId: string
+    userId: string,
   ): Promise<ApiResponse<void>> {
     try {
       // First verify ownership

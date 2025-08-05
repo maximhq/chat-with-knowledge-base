@@ -1,6 +1,6 @@
 // Core application types for modular architecture
 
-import { MessageRole, FileStatus } from '@prisma/client';
+import { MessageRole, FileStatus } from "@prisma/client";
 
 export interface User {
   id: string;
@@ -38,12 +38,16 @@ export interface Document {
   originalName: string;
   mimeType: string;
   size: number;
-  path: string;
-  userId: string;
+  threadId: string;
   status: FileStatus;
+  chunkCount: number;
   createdAt: Date;
   updatedAt: Date;
-  chunks?: DocumentChunk[];
+  thread?: {
+    id: string;
+    title: string;
+    userId: string;
+  };
 }
 
 export interface DocumentChunk {
@@ -84,7 +88,7 @@ export interface ChatStreamResponse {
 export interface FileUploadProgress {
   filename: string;
   progress: number;
-  status: 'uploading' | 'processing' | 'complete' | 'error';
+  status: "uploading" | "processing" | "complete" | "error";
   error?: string;
 }
 
@@ -92,7 +96,7 @@ export interface FileUploadProgress {
 export interface ContextProvider {
   id: string;
   name: string;
-  type: 'document' | 'link' | 'memory';
+  type: "document" | "link" | "memory";
   enabled: boolean;
 }
 

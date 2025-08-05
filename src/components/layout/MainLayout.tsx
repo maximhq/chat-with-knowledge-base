@@ -15,17 +15,60 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useThreadStore, useUIStore, useActiveTab } from "@/stores";
+import { useRouter, usePathname } from "next/navigation";
+import { useEffect } from "react";
 
 interface MainLayoutProps {
-  children?: React.ReactNode;
+  threadId?: string;
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
+export function MainLayout({ threadId }: MainLayoutProps) {
   const { data: session, status } = useSession();
   const selectedThreadId = useThreadStore((state) => state.selectedThreadId);
   const selectThread = useThreadStore((state) => state.selectThread);
   const activeTab = useActiveTab();
   const setActiveTab = useUIStore((state) => state.setActiveTab);
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Handle URL-based thread selection
+  useEffect(() => {
+    if (threadId && threadId !== selectedThreadId) {
+      selectThread(threadId);
+      setActiveTab("messages");
+    } else if (!threadId && selectedThreadId && pathname === "/") {
+      // URL has no threadId but store has a selected thread
+      // Check if the selected thread still exists before redirecting
+      const threads = useThreadStore.getState().threads;
+      const threadExists = threads.some((t) => t.id === selectedThreadId);
+      if (threadExists) {
+        router.push(`/thread/${selectedThreadId}`);
+      } else {
+        // Thread doesn't exist, clear the selection
+        selectThread(null);
+      }
+    }
+  }, [
+    threadId,
+    selectedThreadId,
+    selectThread,
+    setActiveTab,
+    router,
+    pathname,
+  ]);
+
+  // Handle thread selection with URL navigation
+  const handleThreadSelect = (newThreadId: string | null) => {
+    if (newThreadId) {
+      router.push(`/thread/${newThreadId}`);
+    } else {
+      // Clear store state first to prevent race conditions
+      selectThread(null);
+      setActiveTab("messages");
+      // Then redirect
+      router.push("/");
+    }
+  };
 
   if (status === "loading") {
     return (
@@ -42,11 +85,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <div className="w-80 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <Sidebar
             selectedThreadId={selectedThreadId}
-            onThreadSelect={selectThread}
-            onNewThread={() => {
-              selectThread(null);
-              setActiveTab("messages");
-            }}
+            onThreadSelect={handleThreadSelect}
           />
         </div>
 
@@ -117,7 +156,7 @@ export function MainLayout({ children }: MainLayoutProps) {
             <Workspace
               activeTab={activeTab}
               selectedThreadId={selectedThreadId}
-              onThreadSelect={selectThread}
+              onThreadSelect={handleThreadSelect}
             />
           </div>
         </div>

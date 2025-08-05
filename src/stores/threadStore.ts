@@ -164,17 +164,17 @@ export const useThreadStore = create<ThreadState>()(
             });
           }
         },
-      }))
+      })),
     ),
-    { name: "thread-store" }
-  )
+    { name: "thread-store" },
+  ),
 );
 
 // Selectors for optimized re-renders
 export const useSelectedThread = () =>
   useThreadStore(
     (state) =>
-      state.threads.find((t) => t.id === state.selectedThreadId) || null
+      state.threads.find((t) => t.id === state.selectedThreadId) || null,
   );
 
 export const useThreadsCount = () =>

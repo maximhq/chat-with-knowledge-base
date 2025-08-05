@@ -5,7 +5,6 @@ import type {
   Thread,
   Message,
   Document,
-  DocumentChunk,
   ExternalLink,
   FileStatus,
 } from "@/types";
@@ -34,7 +33,7 @@ export class UserStorage {
   }
 
   static async create(
-    data: Omit<User, "id" | "createdAt" | "updatedAt">
+    data: Omit<User, "id" | "createdAt" | "updatedAt">,
   ): Promise<User> {
     return await prisma.user.create({
       data,
@@ -75,15 +74,19 @@ export class ThreadStorage {
     });
   }
 
-  static async create(
-    data: { title: string; userId: string }
-  ): Promise<Thread> {
+  static async create(data: {
+    title: string;
+    userId: string;
+  }): Promise<Thread> {
     return await prisma.thread.create({
       data,
     });
   }
 
-  static async update(id: string, data: { title?: string; updatedAt?: Date }): Promise<Thread> {
+  static async update(
+    id: string,
+    data: { title?: string; updatedAt?: Date },
+  ): Promise<Thread> {
     return await prisma.thread.update({
       where: { id },
       data,
@@ -107,7 +110,7 @@ export class MessageStorage {
   }
 
   static async create(
-    data: Omit<Message, "id" | "createdAt">
+    data: Omit<Message, "id" | "createdAt">,
   ): Promise<Message> {
     return await prisma.message.create({
       data,
@@ -131,10 +134,20 @@ export class MessageStorage {
 export class DocumentStorage {
   static async findByUserId(userId: string): Promise<Document[]> {
     return await prisma.document.findMany({
-      where: { userId },
+      where: {
+        thread: {
+          userId: userId,
+        },
+      },
       orderBy: { createdAt: "desc" },
       include: {
-        chunks: true,
+        thread: {
+          select: {
+            id: true,
+            title: true,
+            userId: true,
+          },
+        },
       },
     });
   }
@@ -143,22 +156,27 @@ export class DocumentStorage {
     return await prisma.document.findUnique({
       where: { id },
       include: {
-        chunks: true,
+        thread: {
+          select: {
+            id: true,
+            title: true,
+            userId: true,
+          },
+        },
       },
     });
   }
 
-  static async create(
-    data: {
-      filename: string;
-      originalName: string;
-      mimeType: string;
-      size: number;
-      path: string;
-      status: FileStatus;
-      userId: string;
-    }
-  ): Promise<Document> {
+  static async create(data: {
+    filename: string;
+    originalName: string;
+    mimeType: string;
+    size: number;
+    path: string;
+    status: FileStatus;
+    threadId: string;
+    chunkCount?: number;
+  }): Promise<Document> {
     return await prisma.document.create({
       data,
     });
@@ -178,41 +196,8 @@ export class DocumentStorage {
   }
 }
 
-// Document chunk operations
-export class DocumentChunkStorage {
-  static async createMany(
-    chunks: Omit<DocumentChunk, "id" | "createdAt">[]
-  ): Promise<void> {
-    await prisma.documentChunk.createMany({
-      data: chunks,
-    });
-  }
-
-  static async findByDocumentId(documentId: string): Promise<DocumentChunk[]> {
-    return await prisma.documentChunk.findMany({
-      where: { documentId },
-      orderBy: { chunkIndex: "asc" },
-    });
-  }
-
-  static async searchSimilar(
-    embedding: string,
-    limit: number = 10
-  ): Promise<DocumentChunk[]> {
-    // Note: This is a simplified version. In production, you'd use vector similarity search
-    // with a vector database like Pinecone, Weaviate, or PostgreSQL with pgvector
-    return await prisma.documentChunk.findMany({
-      take: limit,
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  static async deleteByDocumentId(documentId: string): Promise<void> {
-    await prisma.documentChunk.deleteMany({
-      where: { documentId },
-    });
-  }
-}
+// Note: DocumentChunk operations removed - embeddings now stored only in Qdrant
+// Document metadata and chunk counts are tracked in the Document table
 
 // External link operations
 export class ExternalLinkStorage {
@@ -224,7 +209,7 @@ export class ExternalLinkStorage {
   }
 
   static async create(
-    data: Omit<ExternalLink, "id" | "createdAt" | "updatedAt">
+    data: Omit<ExternalLink, "id" | "createdAt" | "updatedAt">,
   ): Promise<ExternalLink> {
     return await prisma.externalLink.create({
       data,
@@ -233,7 +218,7 @@ export class ExternalLinkStorage {
 
   static async update(
     id: string,
-    data: Partial<ExternalLink>
+    data: Partial<ExternalLink>,
   ): Promise<ExternalLink> {
     return await prisma.externalLink.update({
       where: { id },

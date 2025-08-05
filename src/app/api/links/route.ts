@@ -1,7 +1,12 @@
 // API routes for external link management
-import { NextRequest } from 'next/server';
-import { ExternalLinkStorage } from '@/modules/storage';
-import { withApiMiddleware, schemas, rateLimits, ApiUtils } from '@/modules/api';
+import { NextRequest } from "next/server";
+import { ExternalLinkStorage } from "@/modules/storage";
+import {
+  withApiMiddleware,
+  schemas,
+  rateLimits,
+  ApiUtils,
+} from "@/modules/api";
 
 // GET /api/links - Get all links for authenticated user
 export const GET = withApiMiddleware(
@@ -12,21 +17,21 @@ export const GET = withApiMiddleware(
       return ApiUtils.createResponse({
         success: true,
         data: links,
-        message: `Found ${links.length} links`
+        message: `Found ${links.length} links`,
       });
     } catch (error) {
-      console.error('Error fetching links:', error);
-      return ApiUtils.createErrorResponse('Failed to fetch links', 500);
+      console.error("Error fetching links:", error);
+      return ApiUtils.createErrorResponse("Failed to fetch links", 500);
     }
-  }
+  },
 );
 
 // POST /api/links - Add new external link
 export const POST = withApiMiddleware(
-  { 
-    auth: true, 
+  {
+    auth: true,
     rateLimit: rateLimits.default,
-    validation: schemas.createLink
+    validation: schemas.createLink,
   },
   async (request: NextRequest, { userId, data }) => {
     try {
@@ -34,17 +39,20 @@ export const POST = withApiMiddleware(
         url: data!.url,
         title: data!.title || null,
         content: null,
-        userId: userId!
+        userId: userId!,
       });
 
-      return ApiUtils.createResponse({
-        success: true,
-        data: link,
-        message: 'Link added successfully'
-      }, 201);
+      return ApiUtils.createResponse(
+        {
+          success: true,
+          data: link,
+          message: "Link added successfully",
+        },
+        201,
+      );
     } catch (error) {
-      console.error('Error creating link:', error);
-      return ApiUtils.createErrorResponse('Failed to add link', 500);
+      console.error("Error creating link:", error);
+      return ApiUtils.createErrorResponse("Failed to add link", 500);
     }
-  }
+  },
 );

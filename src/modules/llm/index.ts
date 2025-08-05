@@ -21,7 +21,7 @@ export class LLMGateway {
   constructor(config?: Partial<BifrostConfig>) {
     this.config = {
       apiUrl: process.env.BIFROST_API_URL || "http://localhost:8080",
-      apiKey: process.env.BIFROST_API_KEY,
+      apiKey: process.env.BIFROST_API_KEY, // Handled by Bifrost
       timeout: 30000, // 30 seconds
       retries: 3,
       ...config,
@@ -30,9 +30,13 @@ export class LLMGateway {
     // Use OpenAI SDK with Bifrost's OpenAI-compatible endpoint
     this.openai = new OpenAI({
       baseURL: `${this.config.apiUrl}/openai`,
-      apiKey: "dummy-api-key", // Handled by Bifrost
+      apiKey: this.config.apiKey,
       timeout: this.config.timeout,
     });
+    // this.openai = new OpenAI({
+    //   apiKey: process.env.OPENAI_API_KEY,
+    //   timeout: this.config.timeout,
+    // });
   }
 
   /**
@@ -49,7 +53,7 @@ export class LLMGateway {
       // Use OpenAI SDK with Bifrost's OpenAI-compatible endpoint
       // For now, we only support non-streaming responses
       const response = await this.openai.chat.completions.create({
-        model: request.model || "gpt-3.5-turbo",
+        model: request.model || "openai/gpt-4o",
         messages,
         temperature: request.temperature || 0.7,
         max_tokens: request.maxTokens || 2000,
@@ -85,137 +89,84 @@ export class LLMGateway {
   }
 
   /**
-   * Send a streaming chat completion request
+   * Send a streaming chat completion request using OpenAI SDK
    */
   async streamChatCompletion(
     request: LLMRequest,
     onChunk: (chunk: string) => void,
     onComplete: () => void,
-    onError: (error: Error) => void
+    onError: (error: Error) => void,
   ): Promise<void> {
     try {
-      const response = await this.makeRequest("/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "text/event-stream",
-          ...(this.config.apiKey && {
-            Authorization: `Bearer ${this.config.apiKey}`,
-          }),
-        },
-        body: JSON.stringify({
-          model: request.model || "gpt-3.5-turbo",
-          messages: request.messages,
-          temperature: request.temperature || 0.7,
-          max_tokens: request.maxTokens || 2000,
-          stream: true,
-        }),
+      // Convert our message format to OpenAI SDK format
+      const messages = request.messages.map((msg) => ({
+        role: msg.role as "system" | "user" | "assistant",
+        content: msg.content,
+      }));
+
+      // Use OpenAI SDK for streaming
+      const stream = await this.openai.chat.completions.create({
+        model: request.model || "openai/gpt-4o",
+        messages,
+        temperature: request.temperature || 0.7,
+        max_tokens: request.maxTokens || 2000,
+        stream: true,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          `Bifrost API error: ${response.status} - ${
-            errorData.error || response.statusText
-          }`
-        );
-      }
-
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error("No response body reader available");
-      }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (done) {
-            onComplete();
-            break;
-          }
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              const data = line.slice(6);
-
-              if (data === "[DONE]") {
-                onComplete();
-                return;
-              }
-
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices[0]?.delta?.content;
-                if (content) {
-                  onChunk(content);
-                }
-              } catch (parseError) {
-                console.warn("Failed to parse streaming chunk:", parseError);
-              }
-            }
-          }
+      // Process the stream
+      for await (const chunk of stream) {
+        const content = chunk.choices[0]?.delta?.content;
+        if (content) {
+          onChunk(content);
         }
-      } finally {
-        reader.releaseLock();
       }
+
+      onComplete();
     } catch (error) {
-      console.error("Streaming error:", error);
+      console.error("Streaming chat completion error:", error);
       onError(
-        error instanceof Error ? error : new Error("Unknown streaming error")
+        error instanceof Error ? error : new Error("Unknown streaming error"),
       );
     }
   }
 
   /**
-   * Generate embeddings for text
+   * Generate embeddings for text using OpenAI SDK
    */
   async generateEmbeddings(texts: string[]): Promise<ApiResponse<number[][]>> {
     try {
-      const response = await this.makeRequest("/v1/embeddings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(this.config.apiKey && {
-            Authorization: `Bearer ${this.config.apiKey}`,
-          }),
-        },
-        body: JSON.stringify({
-          model: "text-embedding-ada-002",
-          input: texts,
-        }),
+      console.log(
+        `Generating embeddings for ${texts.length} texts using Bifrost`,
+      );
+      console.log(`Bifrost baseURL: ${this.openai.baseURL}`);
+      console.log(`First text sample: "${texts[0]?.substring(0, 100)}..."`);
+
+      // Use OpenAI SDK for embeddings with Bifrost-compatible model
+      const response = await this.openai.embeddings.create({
+        model: "text-embedding-3-small",
+        input: texts,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          `Bifrost API error: ${response.status} - ${
-            errorData.error || response.statusText
-          }`
-        );
+      console.log(`Embedding API response:`, JSON.stringify(response, null, 2));
+
+      // Extract embeddings from response
+      const embeddings = response.data.map((item) => item.embedding);
+
+      // Validate embeddings are not all zeros
+      for (let i = 0; i < embeddings.length; i++) {
+        const embedding = embeddings[i];
+        const isAllZeros = embedding.every((val) => val === 0);
+        if (isAllZeros) {
+          console.error(`Warning: Embedding ${i} is all zeros!`);
+          throw new Error(
+            `Generated embedding ${i} contains all zeros - this indicates an API issue`,
+          );
+        }
       }
 
-      const data = (await response.json()) as {
-        data: Array<{
-          embedding: number[];
-          index: number;
-          object: string;
-        }>;
-        model: string;
-        object: string;
-        usage: {
-          prompt_tokens: number;
-          total_tokens: number;
-        };
-      };
-      const embeddings = data.data.map((item) => item.embedding);
+      console.log(
+        `Successfully generated ${embeddings.length} valid embeddings`,
+      );
 
       return {
         success: true,
@@ -224,6 +175,12 @@ export class LLMGateway {
       };
     } catch (error) {
       console.error("Embeddings generation error:", error);
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        baseURL: this.openai.baseURL,
+        textsLength: texts.length,
+      });
       return {
         success: false,
         error:
@@ -235,20 +192,13 @@ export class LLMGateway {
   }
 
   /**
-   * Health check for Bifrost service
+   * Health check for Bifrost service using OpenAI SDK
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await this.makeRequest("/health", {
-        method: "GET",
-        headers: {
-          ...(this.config.apiKey && {
-            Authorization: `Bearer ${this.config.apiKey}`,
-          }),
-        },
-      });
-
-      return response.ok;
+      // Use a simple models list call as health check
+      await this.openai.models.list();
+      return true;
     } catch (error) {
       console.error("Bifrost health check failed:", error);
       return false;
@@ -256,47 +206,13 @@ export class LLMGateway {
   }
 
   /**
-   * Get available models
+   * Get available models using OpenAI SDK
    */
   async getModels(): Promise<ApiResponse<string[]>> {
     try {
-      const response = await this.makeRequest("/v1/models", {
-        method: "GET",
-        headers: {
-          ...(this.config.apiKey && {
-            Authorization: `Bearer ${this.config.apiKey}`,
-          }),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch models: ${response.status}`);
-      }
-
-      const data = (await response.json()) as {
-        data: Array<{
-          id: string;
-          object: string;
-          created: number;
-          owned_by: string;
-          permission?: Array<{
-            id: string;
-            object: string;
-            created: number;
-            allow_create_engine: boolean;
-            allow_sampling: boolean;
-            allow_logprobs: boolean;
-            allow_search_indices: boolean;
-            allow_view: boolean;
-            allow_fine_tuning: boolean;
-            organization: string;
-            group?: string;
-            is_blocking: boolean;
-          }>;
-        }>;
-        object: string;
-      };
-      const models = data.data?.map((model) => model.id) || [];
+      // Use OpenAI SDK to get models
+      const response = await this.openai.models.list();
+      const models = response.data.map((model) => model.id);
 
       return {
         success: true,
@@ -310,44 +226,6 @@ export class LLMGateway {
         error: "Failed to fetch available models",
       };
     }
-  }
-
-  /**
-   * Make HTTP request with retry logic
-   */
-  private async makeRequest(
-    endpoint: string,
-    options: RequestInit
-  ): Promise<Response> {
-    const url = `${this.config.apiUrl}${endpoint}`;
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= this.config.retries; attempt++) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(
-          () => controller.abort(),
-          this.config.timeout
-        );
-
-        const response = await fetch(url, {
-          ...options,
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-        return response;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error("Unknown error");
-
-        if (attempt < this.config.retries) {
-          const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    throw lastError || new Error("All retry attempts failed");
   }
 }
 
@@ -370,13 +248,13 @@ export class ChatService {
       temperature?: number;
       maxTokens?: number;
       stream?: boolean;
-    }
+    },
   ): Promise<ApiResponse<LLMResponse>> {
     try {
       // Prepare messages with context
       const processedMessages = this.prepareMessagesWithContext(
         messages,
-        context
+        context,
       );
 
       const request: LLMRequest = {
@@ -410,12 +288,12 @@ export class ChatService {
       model?: string;
       temperature?: number;
       maxTokens?: number;
-    }
+    },
   ): Promise<void> {
     try {
       const processedMessages = this.prepareMessagesWithContext(
         messages,
-        context
+        context,
       );
 
       const request: LLMRequest = {
@@ -430,12 +308,11 @@ export class ChatService {
         request,
         onChunk,
         onComplete,
-        onError
+        onError,
       );
     } catch (error) {
-      console.error("Streaming chat service error:", error);
       onError(
-        error instanceof Error ? error : new Error("Unknown streaming error")
+        error instanceof Error ? error : new Error("Unknown streaming error"),
       );
     }
   }
@@ -445,7 +322,7 @@ export class ChatService {
    */
   private prepareMessagesWithContext(
     messages: Array<{ role: string; content: string }>,
-    context?: ContextChunk[]
+    context?: ContextChunk[],
   ): Array<{ role: string; content: string }> {
     if (!context || context.length === 0) {
       return messages;
@@ -455,7 +332,7 @@ export class ChatService {
     const contextText = context
       .map(
         (chunk, index) =>
-          `[Source ${index + 1}] ${chunk.source}:\n${chunk.content}`
+          `[Source ${index + 1}] ${chunk.source}:\n${chunk.content}`,
       )
       .join("\n\n");
 

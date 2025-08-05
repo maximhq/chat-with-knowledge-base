@@ -15,7 +15,7 @@ import {
 
 interface ChatInterfaceProps {
   threadId: string | null;
-  onThreadSelect: (threadId: string) => void;
+  onThreadSelect: (threadId: string | null) => void;
 }
 
 export function ChatInterface({
@@ -94,7 +94,7 @@ export function ChatInterface({
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
       .replace(
         /`(.*?)`/g,
-        '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm">$1</code>'
+        '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded text-sm">$1</code>',
       )
       .replace(/\n/g, "<br>");
   };

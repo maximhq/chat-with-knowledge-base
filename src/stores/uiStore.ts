@@ -53,10 +53,10 @@ export const useUIStore = create<UIState>()(
           theme: state.theme,
           sidebarCollapsed: state.sidebarCollapsed,
         }),
-      }
+      },
     ),
-    { name: "ui-store" }
-  )
+    { name: "ui-store" },
+  ),
 );
 
 // Selectors

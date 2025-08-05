@@ -170,7 +170,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
       const callbackUrl = `${
         window.location.origin
       }/api/auth/callback/email?token=${otp}&email=${encodeURIComponent(
-        email
+        email,
       )}`;
       window.location.href = callbackUrl;
     } catch (error) {

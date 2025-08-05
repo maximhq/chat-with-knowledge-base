@@ -1,34 +1,62 @@
-// API routes for document management
 import { NextRequest } from "next/server";
-import { FileUploadManager } from "@/modules/uploads";
+import { prisma } from "@/modules/storage";
 import { withApiMiddleware, rateLimits, ApiUtils } from "@/modules/api";
 
-// GET /api/documents - Get all documents for authenticated user
 export const GET = withApiMiddleware(
   { auth: true, rateLimit: rateLimits.default },
   async (request: NextRequest, { userId }) => {
-    const result = await FileUploadManager.getUserDocuments(userId!);
-    return ApiUtils.createResponse(result);
-  }
-);
-
-// POST /api/documents - Upload new document
-export const POST = withApiMiddleware(
-  { auth: true, rateLimit: rateLimits.upload },
-  async (request: NextRequest, { userId }) => {
     try {
-      const formData = await request.formData();
-      const file = formData.get("file") as File;
+      const { searchParams } = new URL(request.url);
+      const threadId = searchParams.get("threadId");
 
-      if (!file) {
-        return ApiUtils.createErrorResponse("No file provided", 400);
+      if (!threadId) {
+        return ApiUtils.createErrorResponse(
+          "threadId parameter is required",
+          400,
+        );
       }
 
-      const result = await FileUploadManager.uploadFile(file, userId!);
-      return ApiUtils.createResponse(result, result.success ? 201 : 400);
+      const documents = await prisma.document.findMany({
+        where: {
+          threadId: threadId,
+          thread: {
+            userId: userId!,
+          },
+        },
+        include: {
+          thread: {
+            select: {
+              id: true,
+              title: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      const transformedDocuments = documents.map((doc) => ({
+        id: doc.id,
+        filename: doc.filename,
+        originalName: doc.originalName,
+        mimeType: doc.mimeType,
+        size: doc.size,
+        chunksCount: doc.chunkCount,
+        threadId: doc.threadId,
+        threadTitle: doc.thread?.title,
+        createdAt: doc.createdAt.toISOString(),
+        status: doc.status.toLowerCase(),
+      }));
+
+      return ApiUtils.createResponse({
+        success: true,
+        data: transformedDocuments,
+        message: `Found ${transformedDocuments.length} documents`,
+      });
     } catch (error) {
-      console.error("Document upload error:", error);
-      return ApiUtils.createErrorResponse("Failed to upload document", 500);
+      console.error("Failed to fetch documents:", error);
+      return ApiUtils.createErrorResponse("Failed to fetch documents", 500);
     }
-  }
+  },
 );

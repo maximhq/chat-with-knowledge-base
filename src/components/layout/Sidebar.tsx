@@ -10,15 +10,10 @@ import type { Thread } from "@/types";
 
 interface SidebarProps {
   selectedThreadId: string | null;
-  onThreadSelect: (threadId: string) => void;
-  onNewThread: () => void;
+  onThreadSelect: (threadId: string | null) => void;
 }
 
-export function Sidebar({
-  selectedThreadId,
-  onThreadSelect,
-  onNewThread,
-}: SidebarProps) {
+export function Sidebar({ selectedThreadId, onThreadSelect }: SidebarProps) {
   const threads = useThreadStore((state) => state.threads);
   const isLoading = useThreadStore((state) => state.isLoading);
   const fetchThreads = useThreadStore((state) => state.fetchThreads);
@@ -43,9 +38,15 @@ export function Sidebar({
       return;
     }
 
+    // Check if we're deleting the currently selected thread
+    const isDeletingSelectedThread = selectedThreadId === threadId;
+
+    // Delete the thread
     await removeThread(threadId);
-    if (selectedThreadId === threadId) {
-      onNewThread();
+
+    // If we deleted the currently selected thread, redirect to root
+    if (isDeletingSelectedThread) {
+      onThreadSelect(null);
     }
   };
 

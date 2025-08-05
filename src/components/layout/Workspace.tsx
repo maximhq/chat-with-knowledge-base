@@ -7,7 +7,7 @@ import { KnowledgeBaseInterface } from "@/components/knowledge-base/KnowledgeBas
 interface WorkspaceProps {
   activeTab: "messages" | "knowledge-base";
   selectedThreadId: string | null;
-  onThreadSelect: (threadId: string) => void;
+  onThreadSelect: (threadId: string | null) => void;
 }
 
 export function Workspace({

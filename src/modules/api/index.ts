@@ -1,6 +1,7 @@
 // API Module - REST endpoints with validation, auth checks, and rate limiting
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/modules/auth";
+import { ApiKeyManager } from "@/modules/api-keys";
 import type { ApiResponse } from "@/types";
 import { z } from "zod";
 
@@ -67,7 +68,7 @@ export class ApiUtils {
    */
   static createResponse<T>(
     data: ApiResponse<T>,
-    status: number = 200
+    status: number = 200,
   ): NextResponse {
     return NextResponse.json(data, { status });
   }
@@ -77,14 +78,14 @@ export class ApiUtils {
    */
   static createErrorResponse(
     error: string,
-    status: number = 400
+    status: number = 400,
   ): NextResponse {
     return NextResponse.json(
       {
         success: false,
         error,
       },
-      { status }
+      { status },
     );
   }
 
@@ -93,7 +94,7 @@ export class ApiUtils {
    */
   static validateRequest<T>(
     body: unknown,
-    schema: z.ZodSchema<T>
+    schema: z.ZodSchema<T>,
   ): { success: true; data: T } | { success: false; errors: string[] } {
     try {
       const data = schema.parse(body);
@@ -101,7 +102,7 @@ export class ApiUtils {
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errors = error.errors.map(
-          (err) => `${err.path.join(".")}: ${err.message}`
+          (err) => `${err.path.join(".")}: ${err.message}`,
         );
         return { success: false, errors };
       }
@@ -110,16 +111,84 @@ export class ApiUtils {
   }
 
   /**
-   * Extract user ID from session using NextAuth.js v5
+   * Extract user ID from session or API key authentication
+   * Supports both NextAuth.js v5 session and API key authentication
    */
-  static async getUserId(request: NextRequest): Promise<string | null> {
+  static async getUserId(request?: NextRequest): Promise<string | null> {
     try {
+      // First, try API key authentication if request is provided
+      if (request) {
+        const apiKey = this.extractApiKey(request);
+        if (apiKey) {
+          const apiKeyAuth = await ApiKeyManager.validateApiKey(apiKey);
+          if (apiKeyAuth) {
+            return apiKeyAuth.userId;
+          }
+        }
+      }
+
+      // Fall back to session authentication
       const session = await auth();
-      return session?.user?.id || null;
+      if (!session?.user?.id) {
+        return null;
+      }
+
+      // Ensure user exists in database
+      const { prisma } = await import("@/modules/storage");
+
+      // Check if user exists
+      let user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+      });
+
+      // If user doesn't exist, create them
+      if (!user && session.user.email) {
+        try {
+          user = await prisma.user.create({
+            data: {
+              id: session.user.id,
+              email: session.user.email,
+              name: session.user.name || null,
+              image: session.user.image || null,
+            },
+          });
+          console.log(`Created user in database: ${user.id}`);
+        } catch (createError) {
+          // Handle case where user might have been created by another request
+          console.warn("Error creating user, checking if exists:", createError);
+          user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+          });
+        }
+      }
+
+      return user?.id || null;
     } catch (error) {
       console.error("Error getting user ID:", error);
       return null;
     }
+  }
+
+  /**
+   * Extract API key from request headers
+   */
+  static extractApiKey(request: NextRequest): string | null {
+    // Check Authorization header: "Bearer ak_..."
+    const authHeader = request.headers.get("authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      if (token.startsWith("ak_")) {
+        return token;
+      }
+    }
+
+    // Check X-API-Key header
+    const apiKeyHeader = request.headers.get("x-api-key");
+    if (apiKeyHeader?.startsWith("ak_")) {
+      return apiKeyHeader;
+    }
+
+    return null;
   }
 
   /**
@@ -170,7 +239,7 @@ export class RateLimiter {
    */
   static checkRateLimit(
     clientId: string,
-    limit: { requests: number; windowMs: number }
+    limit: { requests: number; windowMs: number },
   ): { allowed: boolean; resetTime?: number; remaining?: number } {
     const now = Date.now();
     const key = `${clientId}:${Math.floor(now / limit.windowMs)}`;
@@ -236,7 +305,7 @@ export async function requireAuth(): Promise<ApiResponse<null> | null> {
 
 export function withRateLimit(
   limit: { requests: number; windowMs: number },
-  handler: (request: NextRequest) => Promise<NextResponse>
+  handler: (request: NextRequest) => Promise<NextResponse>,
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
     try {
@@ -261,7 +330,7 @@ export function withRateLimit(
               "X-RateLimit-Remaining": "0",
               "X-RateLimit-Reset": resetTime || "",
             },
-          }
+          },
         );
       }
 
@@ -271,7 +340,7 @@ export function withRateLimit(
       response.headers.set("X-RateLimit-Limit", limit.requests.toString());
       response.headers.set(
         "X-RateLimit-Remaining",
-        (rateCheck.remaining || 0).toString()
+        (rateCheck.remaining || 0).toString(),
       );
 
       return response;
@@ -284,7 +353,7 @@ export function withRateLimit(
 
 export function withValidation<T>(
   schema: z.ZodSchema<T>,
-  handler: (request: NextRequest, data: T) => Promise<NextResponse>
+  handler: (request: NextRequest, data: T) => Promise<NextResponse>,
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
     try {
@@ -294,7 +363,7 @@ export function withValidation<T>(
       if (!validation.success) {
         return ApiUtils.createErrorResponse(
           `Validation failed: ${validation.errors.join(", ")}`,
-          400
+          400,
         );
       }
 
@@ -315,8 +384,8 @@ export function withApiMiddleware<T>(
   },
   handler: (
     request: NextRequest,
-    context: { userId?: string; data?: T }
-  ) => Promise<NextResponse>
+    context: { userId?: string; data?: T },
+  ) => Promise<NextResponse>,
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
     try {
@@ -327,7 +396,7 @@ export function withApiMiddleware<T>(
         const clientIP = ApiUtils.getClientIP(request);
         const rateCheck = RateLimiter.checkRateLimit(
           clientIP,
-          options.rateLimit
+          options.rateLimit,
         );
 
         if (!rateCheck.allowed) {
@@ -352,7 +421,7 @@ export function withApiMiddleware<T>(
         if (!validation.success) {
           return ApiUtils.createErrorResponse(
             `Validation failed: ${validation.errors.join(", ")}`,
-            400
+            400,
           );
         }
         context.data = validation.data;
@@ -377,17 +446,12 @@ export async function healthCheck(): Promise<NextResponse> {
     const { chatService } = await import("@/modules/llm");
     const llmHealth = await chatService.healthCheck();
 
-    // Check MCP server
-    const { mcpServer } = await import("@/modules/mcp");
-    const mcpHealth = await mcpServer.healthCheck();
-
     const health = {
       status: "ok",
       timestamp: new Date().toISOString(),
       services: {
         database: dbHealth,
         llm: llmHealth,
-        mcp: Object.values(mcpHealth).every(Boolean),
       },
     };
 
@@ -404,7 +468,7 @@ export async function healthCheck(): Promise<NextResponse> {
         timestamp: new Date().toISOString(),
         error: "Health check failed",
       },
-      { status: 503 }
+      { status: 503 },
     );
   }
 }

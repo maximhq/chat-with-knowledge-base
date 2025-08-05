@@ -16,7 +16,7 @@ export class MessageManager {
     threadId: string,
     content: string,
     role: MessageRole,
-    userId: string
+    userId: string,
   ): Promise<ApiResponse<Message>> {
     try {
       // Verify thread ownership
@@ -75,7 +75,7 @@ export class MessageManager {
    */
   static async getThreadMessages(
     threadId: string,
-    userId: string
+    userId: string,
   ): Promise<ApiResponse<Message[]>> {
     try {
       // Verify thread ownership
@@ -111,11 +111,32 @@ export class MessageManager {
   }
 
   /**
+   * Send a message to a thread
+   */
+  static async sendMessage(
+    threadId: string,
+    userId: string,
+    content: string,
+  ): Promise<ApiResponse<Message>> {
+    // Validate message content
+    const validation = this.validateMessageContent(content);
+    if (!validation.isValid) {
+      return {
+        success: false,
+        error: validation.errors.join(", "),
+      };
+    }
+
+    // Add the user message
+    return await this.addMessage(threadId, content, "USER", userId);
+  }
+
+  /**
    * Delete a message
    */
   static async deleteMessage(
     messageId: string,
-    userId: string
+    userId: string,
   ): Promise<ApiResponse<void>> {
     try {
       const message = await MessageStorage.findById(messageId);
@@ -154,7 +175,7 @@ export class MessageManager {
    * Format messages for LLM consumption
    */
   static formatMessagesForLLM(
-    messages: Message[]
+    messages: Message[],
   ): Array<{ role: string; content: string }> {
     return messages.map((message) => ({
       role: message.role.toLowerCase(),
@@ -205,7 +226,7 @@ export class MessageManager {
    * Extract code blocks from message content
    */
   static extractCodeBlocks(
-    content: string
+    content: string,
   ): Array<{ language: string; code: string }> {
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
     const codeBlocks: Array<{ language: string; code: string }> = [];
@@ -226,7 +247,7 @@ export class MessageManager {
    */
   static getConversationContext(
     messages: Message[],
-    maxMessages: number = 20
+    maxMessages: number = 20,
   ): Message[] {
     return messages.slice(-maxMessages);
   }
@@ -244,7 +265,7 @@ export class MessageManager {
    */
   static truncateConversation(
     messages: Message[],
-    maxTokens: number = 4000
+    maxTokens: number = 4000,
   ): Message[] {
     let totalTokens = 0;
     const truncatedMessages: Message[] = [];
@@ -295,7 +316,7 @@ class StreamingMessageHandler {
    */
   static processStreamChunk(
     chunk: string,
-    messageId: string
+    messageId: string,
   ): ChatStreamResponse {
     try {
       // Parse the streaming chunk (format depends on LLM provider)

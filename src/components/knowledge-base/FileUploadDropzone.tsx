@@ -2,13 +2,13 @@
 
 import React, { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, File, X } from "lucide-react";
+import { Upload, File, X, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useThreadStore } from "@/stores";
 
 interface FileUploadDropzoneProps {
   onFilesSelected: (files: File[]) => void;
   onUploadComplete?: (results: UploadResult[]) => void;
-  threadId?: string;
   maxFiles?: number;
   maxSize?: number;
   acceptedTypes?: string[];
@@ -21,12 +21,12 @@ interface UploadResult {
   documentId?: string;
   chunksProcessed?: number;
   error?: string;
+  file?: File; // Store the original file for retry
 }
 
 export function FileUploadDropzone({
   onFilesSelected,
   onUploadComplete,
-  threadId,
   maxFiles = 10,
   maxSize = 10 * 1024 * 1024, // 10MB
   acceptedTypes = [
@@ -70,23 +70,28 @@ export function FileUploadDropzone({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadResults, setUploadResults] = useState<UploadResult[]>([]);
+  const [retryingFiles, setRetryingFiles] = useState<Set<string>>(new Set());
+  const selectedThreadId = useThreadStore((state) => state.selectedThreadId!);
 
   const onDrop = useCallback(
     (acceptedFiles: File[]) => {
       setSelectedFiles((prev) =>
-        [...prev, ...acceptedFiles].slice(0, maxFiles)
+        [...prev, ...acceptedFiles].slice(0, maxFiles),
       );
     },
-    [maxFiles]
+    [maxFiles],
   );
 
   const { getRootProps, getInputProps, isDragActive, fileRejections } =
     useDropzone({
       onDrop,
-      accept: acceptedTypes.reduce((acc, type) => {
-        acc[type] = [];
-        return acc;
-      }, {} as Record<string, string[]>),
+      accept: acceptedTypes.reduce(
+        (acc, type) => {
+          acc[type] = [];
+          return acc;
+        },
+        {} as Record<string, string[]>,
+      ),
       maxSize,
       maxFiles,
       multiple: true,
@@ -113,8 +118,8 @@ export function FileUploadDropzone({
             // Create FormData for file upload
             const formData = new FormData();
             formData.append("file", file);
-            if (threadId) {
-              formData.append("threadId", threadId);
+            if (selectedThreadId) {
+              formData.append("threadId", selectedThreadId);
             }
 
             // Upload file to server
@@ -139,7 +144,7 @@ export function FileUploadDropzone({
               body: JSON.stringify({
                 filePath,
                 fileName: file.name,
-                threadId,
+                threadId: selectedThreadId,
               }),
             });
 
@@ -161,6 +166,7 @@ export function FileUploadDropzone({
               fileName: file.name,
               success: false,
               error: error instanceof Error ? error.message : "Unknown error",
+              file: file, // Store file for retry
             });
           }
         }
@@ -173,6 +179,119 @@ export function FileUploadDropzone({
       console.error("Upload process failed:", error);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const retryFailedUpload = async (fileName: string) => {
+    // Find the original file from the failed upload
+    const failedResult = uploadResults.find(
+      (result) => result.fileName === fileName && !result.success,
+    );
+
+    if (!failedResult || !failedResult.file) {
+      alert(
+        `Cannot retry upload for "${fileName}". Please re-select the file and upload again.`,
+      );
+      return;
+    }
+
+    setRetryingFiles((prev) => new Set(prev).add(fileName));
+
+    try {
+      const file = failedResult.file;
+
+      // Upload file
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("threadId", selectedThreadId);
+
+      const uploadResponse = await fetch("/api/documents/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed: ${uploadResponse.statusText}`);
+      }
+
+      const uploadData = await uploadResponse.json();
+      const filePath = uploadData.filePath;
+
+      if (autoIndex) {
+        // Index the document
+        const indexResponse = await fetch("/api/documents/index", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            filePath,
+            fileName: file.name,
+            threadId: selectedThreadId,
+          }),
+        });
+
+        if (!indexResponse.ok) {
+          throw new Error(`Indexing failed: ${indexResponse.statusText}`);
+        }
+
+        const indexData = await indexResponse.json();
+
+        // Update the result to success
+        setUploadResults((prev) =>
+          prev.map((result) =>
+            result.fileName === fileName
+              ? {
+                  fileName: file.name,
+                  success: true,
+                  documentId: indexData.documentId,
+                  chunksProcessed: indexData.chunksProcessed,
+                }
+              : result,
+          ),
+        );
+      } else {
+        // Just mark as uploaded successfully
+        setUploadResults((prev) =>
+          prev.map((result) =>
+            result.fileName === fileName
+              ? {
+                  fileName: file.name,
+                  success: true,
+                  documentId: uploadData.documentId,
+                  chunksProcessed: 0,
+                }
+              : result,
+          ),
+        );
+      }
+
+      // Call the upload complete callback
+      onUploadComplete?.(
+        uploadResults.map((result) =>
+          result.fileName === fileName ? { ...result, success: true } : result,
+        ),
+      );
+    } catch (error) {
+      console.error(`Failed to retry upload for ${fileName}:`, error);
+
+      // Update the error message
+      setUploadResults((prev) =>
+        prev.map((result) =>
+          result.fileName === fileName
+            ? {
+                ...result,
+                error: error instanceof Error ? error.message : "Retry failed",
+              }
+            : result,
+        ),
+      );
+    } finally {
+      setRetryingFiles((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(fileName);
+        return newSet;
+      });
     }
   };
 
@@ -335,6 +454,22 @@ export function FileUploadDropzone({
                     </p>
                   </div>
                 </div>
+                {!result.success && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => retryFailedUpload(result.fileName)}
+                    disabled={retryingFiles.has(result.fileName)}
+                    className="ml-2"
+                  >
+                    {retryingFiles.has(result.fileName) ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-1"></div>
+                    ) : (
+                      <RotateCcw className="h-4 w-4 mr-1" />
+                    )}
+                    Retry
+                  </Button>
+                )}
               </div>
             ))}
           </div>

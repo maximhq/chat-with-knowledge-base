@@ -68,7 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       console.log(
         "User signed in:",
         user.email,
-        isNewUser ? "(new user)" : "(existing user)"
+        isNewUser ? "(new user)" : "(existing user)",
       );
     },
   },
@@ -114,8 +114,8 @@ export function withAuth<T extends Record<string, unknown>>(
   handler: (
     req: NextRequest,
     res: NextResponse,
-    session: Session | null
-  ) => Promise<T>
+    session: Session | null,
+  ) => Promise<T>,
 ) {
   return async (req: NextRequest, res: NextResponse) => {
     try {
@@ -127,7 +127,7 @@ export function withAuth<T extends Record<string, unknown>>(
             success: false,
             error: "Authentication required",
           },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -139,7 +139,7 @@ export function withAuth<T extends Record<string, unknown>>(
           success: false,
           error: "Internal server error",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
   };

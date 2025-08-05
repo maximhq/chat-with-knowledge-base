@@ -1,8 +1,6 @@
-// API route for chat functionality with streaming support
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { MessageManager } from "@/modules/messages";
 import { chatService } from "@/modules/llm";
-import { mcpServer } from "@/modules/mcp";
 import {
   withApiMiddleware,
   schemas,
@@ -20,165 +18,88 @@ export const POST = withApiMiddleware(
   },
   async (request: NextRequest, { userId, data }) => {
     try {
-      const { message, threadId, model, temperature, stream = true } = data!;
+      const { message, threadId, model, temperature } = data!;
 
       // Add user message to thread
       const userMessageResult = await MessageManager.addMessage(
         threadId!,
         message,
         MessageRole.USER,
-        userId!
+        userId!,
       );
 
       if (!userMessageResult.success) {
         return ApiUtils.createErrorResponse(
           userMessageResult.error || "Failed to save user message",
-          400
+          400,
         );
       }
 
-      // Get conversation context
-      const messagesResult = await MessageManager.getThreadMessages(
-        threadId!,
-        userId!
-      );
-      if (!messagesResult.success) {
-        return ApiUtils.createErrorResponse(
-          "Failed to get conversation history",
-          500
+      // Use RAG to generate response with context (handles context retrieval internally)
+      let ragResponse: string | null = null;
+      try {
+        const ragManager = await import("@/modules/rag").then((m) =>
+          m.createRAGManager(),
         );
+        const result = await ragManager.generateResponse(message, threadId!);
+        ragResponse = result.response;
+      } catch (error) {
+        console.warn(
+          "RAG generation failed, falling back to regular chat:",
+          error,
+        );
+        ragResponse = null;
       }
 
-      // Get relevant context from knowledge base
-      const contextResult = await mcpServer.getContext(message, userId!, {
-        maxChunks: 5,
-        minRelevanceScore: 0.2,
-      });
+      // Use RAG response if available, otherwise fall back to regular chat
+      let finalResponse: string;
 
-      const context = contextResult.success ? contextResult.data : [];
-
-      // Format messages for LLM
-      const formattedMessages = MessageManager.formatMessagesForLLM(
-        messagesResult.data!
-      );
-
-      if (stream) {
-        // Return streaming response
-        const encoder = new TextEncoder();
-        let assistantMessageId: string | null = null;
-        let assistantContent = "";
-
-        const stream = new ReadableStream({
-          async start(controller) {
-            try {
-              await chatService.processStreamingMessage(
-                formattedMessages,
-                context,
-                // onChunk
-                (chunk: string) => {
-                  assistantContent += chunk;
-                  const data = JSON.stringify({ content: chunk, done: false });
-                  controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-                },
-                // onComplete
-                async () => {
-                  try {
-                    // Save assistant message
-                    const assistantMessageResult =
-                      await MessageManager.addMessage(
-                        threadId!,
-                        assistantContent,
-                        MessageRole.ASSISTANT,
-                        userId!
-                      );
-
-                    if (assistantMessageResult.success) {
-                      assistantMessageId = assistantMessageResult.data!.id;
-                    }
-
-                    const data = JSON.stringify({
-                      content: "",
-                      done: true,
-                      messageId: assistantMessageId,
-                    });
-                    controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                    controller.close();
-                  } catch (error) {
-                    console.error("Error saving assistant message:", error);
-                    controller.error(error);
-                  }
-                },
-                // onError
-                (error: Error) => {
-                  console.error("Streaming error:", error);
-                  const data = JSON.stringify({
-                    content: "",
-                    done: true,
-                    error: error.message,
-                  });
-                  controller.enqueue(encoder.encode(`data: ${data}\n\n`));
-                  controller.close();
-                },
-                { model, temperature }
-              );
-            } catch (error) {
-              console.error("Chat processing error:", error);
-              controller.error(error);
-            }
-          },
-        });
-
-        // Create NextResponse for streaming
-        return new NextResponse(stream, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-          },
-        });
+      if (ragResponse) {
+        // Use RAG-generated response
+        finalResponse = ragResponse;
       } else {
-        // Return non-streaming response
+        // Fall back to regular chat without context
         const response = await chatService.processMessage(
-          formattedMessages,
-          context,
-          { model, temperature }
+          [{ role: "user", content: message }],
+          [],
+          { model, temperature },
         );
 
         if (!response.success) {
           return ApiUtils.createErrorResponse(
             response.error || "Failed to process message",
-            500
+            500,
           );
         }
 
-        // Save assistant message
-        const assistantMessageResult = await MessageManager.addMessage(
-          threadId!,
-          response.data!.content,
-          MessageRole.ASSISTANT,
-          userId!
-        );
-
-        if (!assistantMessageResult.success) {
-          console.error(
-            "Failed to save assistant message:",
-            assistantMessageResult.error
-          );
-        }
-
-        return ApiUtils.createResponse({
-          success: true,
-          data: {
-            content: response.data!.content,
-            messageId: assistantMessageResult.data?.id,
-            usage: response.data!.usage,
-          },
-        });
+        finalResponse = response.data!.content;
       }
+
+      // Save assistant message
+      const assistantMessageResult = await MessageManager.addMessage(
+        threadId!,
+        finalResponse,
+        MessageRole.ASSISTANT,
+        userId!,
+      );
+
+      if (!assistantMessageResult.success) {
+        console.error(
+          "Failed to save assistant message:",
+          assistantMessageResult.error,
+        );
+      }
+
+      return ApiUtils.createResponse({
+        success: true,
+        data: {
+          content: finalResponse,
+          messageId: assistantMessageResult.data?.id,
+        },
+      });
     } catch (error) {
       console.error("Chat API error:", error);
       return ApiUtils.createErrorResponse("Internal server error", 500);
     }
-  }
+  },
 );
