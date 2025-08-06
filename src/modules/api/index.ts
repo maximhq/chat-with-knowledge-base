@@ -173,16 +173,6 @@ export class ApiUtils {
    * Extract API key from request headers
    */
   static extractApiKey(request: NextRequest): string | null {
-    // Check Authorization header: "Bearer ak_..."
-    const authHeader = request.headers.get("authorization");
-    if (authHeader?.startsWith("Bearer ")) {
-      const token = authHeader.slice(7);
-      if (token.startsWith("ak_")) {
-        return token;
-      }
-    }
-
-    // Check X-API-Key header
     const apiKeyHeader = request.headers.get("x-api-key");
     if (apiKeyHeader?.startsWith("ak_")) {
       return apiKeyHeader;

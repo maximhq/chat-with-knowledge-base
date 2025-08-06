@@ -3,7 +3,8 @@
 import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, MessageSquare, Trash2 } from "lucide-react";
+import { Plus, MessageSquare, Trash2, Link } from "lucide-react";
+import { toast } from "sonner";
 
 import { useThreadStore } from "@/stores";
 import type { Thread } from "@/types";
@@ -43,6 +44,19 @@ export function Sidebar({ selectedThreadId, onThreadSelect }: SidebarProps) {
     // If we deleted the currently selected thread, redirect to root
     if (isDeletingSelectedThread) {
       onThreadSelect(null);
+    }
+  };
+
+  const handleCopyLink = async (threadId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    try {
+      const chatUrl = `${window.location.origin}/api/chat/${threadId}`;
+      await navigator.clipboard.writeText(chatUrl);
+      toast.success("Chat link copied to clipboard!");
+    } catch (error) {
+      console.error("Failed to copy link:", error);
+      toast.error("Failed to copy link. Please try again.");
     }
   };
 
@@ -127,12 +141,22 @@ export function Sidebar({ selectedThreadId, onThreadSelect }: SidebarProps) {
                     </div>
 
                     {/* Thread Actions */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex items-center space-x-1">
+                      <Button
+                        onClick={(e) => handleCopyLink(thread.id, e)}
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 w-6 p-0 text-gray-400 hover:text-blue-500"
+                        title="Copy chat link"
+                      >
+                        <Link className="h-3 w-3" />
+                      </Button>
                       <Button
                         onClick={(e) => handleDeleteThread(thread.id, e)}
                         size="sm"
                         variant="ghost"
                         className="h-6 w-6 p-0 text-gray-400 hover:text-red-500"
+                        title="Delete thread"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
