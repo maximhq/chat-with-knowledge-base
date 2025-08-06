@@ -94,7 +94,7 @@ export class LLMGateway {
     request: LLMRequest,
     onChunk: (chunk: string) => void,
     onComplete: () => void,
-    onError: (error: Error) => void,
+    onError: (error: Error) => void
   ): Promise<void> {
     try {
       // Convert our message format to OpenAI SDK format
@@ -124,7 +124,7 @@ export class LLMGateway {
     } catch (error) {
       console.error("Streaming chat completion error:", error);
       onError(
-        error instanceof Error ? error : new Error("Unknown streaming error"),
+        error instanceof Error ? error : new Error("Unknown streaming error")
       );
     }
   }
@@ -135,7 +135,7 @@ export class LLMGateway {
   async generateEmbeddings(texts: string[]): Promise<ApiResponse<number[][]>> {
     try {
       console.log(
-        `Generating embeddings for ${texts.length} texts using Bifrost`,
+        `Generating embeddings for ${texts.length} texts using Bifrost`
       );
       console.log(`Bifrost baseURL: ${this.openai.baseURL}`);
       console.log(`First text sample: "${texts[0]?.substring(0, 100)}..."`);
@@ -158,13 +158,13 @@ export class LLMGateway {
         if (isAllZeros) {
           console.error(`Warning: Embedding ${i} is all zeros!`);
           throw new Error(
-            `Generated embedding ${i} contains all zeros - this indicates an API issue`,
+            `Generated embedding ${i} contains all zeros - this indicates an API issue`
           );
         }
       }
 
       console.log(
-        `Successfully generated ${embeddings.length} valid embeddings`,
+        `Successfully generated ${embeddings.length} valid embeddings`
       );
 
       return {
@@ -228,95 +228,5 @@ export class LLMGateway {
   }
 }
 
-// Chat service that combines LLM with context
-export class ChatService {
-  private llmGateway: LLMGateway;
-
-  constructor(config?: Partial<BifrostConfig>) {
-    this.llmGateway = new LLMGateway(config);
-  }
-
-  /**
-   * Process chat message with context
-   */
-  async processMessage(
-    messages: Array<{ role: string; content: string }>,
-    context?: ContextChunk[],
-    options?: {
-      model?: string;
-      temperature?: number;
-      maxTokens?: number;
-      stream?: boolean;
-    },
-  ): Promise<ApiResponse<LLMResponse>> {
-    try {
-      // Prepare messages with context
-      const processedMessages = this.prepareMessagesWithContext(
-        messages,
-        context,
-      );
-
-      const request: LLMRequest = {
-        messages: processedMessages,
-        model: options?.model,
-        temperature: options?.temperature,
-        maxTokens: options?.maxTokens,
-        stream: options?.stream,
-      };
-
-      return await this.llmGateway.chatCompletion(request);
-    } catch (error) {
-      console.error("Chat service error:", error);
-      return {
-        success: false,
-        error: "Failed to process chat message",
-      };
-    }
-  }
-
-  /**
-   * Prepare messages with context injection
-   */
-  private prepareMessagesWithContext(
-    messages: Array<{ role: string; content: string }>,
-    context?: ContextChunk[],
-  ): Array<{ role: string; content: string }> {
-    if (!context || context.length === 0) {
-      return messages;
-    }
-
-    // Format context
-    const contextText = context
-      .map(
-        (chunk, index) =>
-          `[Source ${index + 1}] ${chunk.source}:\n${chunk.content}`,
-      )
-      .join("\n\n");
-
-    // Add context as system message
-    const systemMessage = {
-      role: "system",
-      content: `You are a helpful assistant with access to a knowledge base. Use the following context to help answer questions when relevant:\n\n${contextText}\n\nIf the context doesn't contain relevant information for the user's question, you can still provide a helpful response based on your general knowledge.`,
-    };
-
-    return [systemMessage, ...messages];
-  }
-
-  /**
-   * Health check
-   */
-  async healthCheck(): Promise<boolean> {
-    return await this.llmGateway.healthCheck();
-  }
-
-  /**
-   * Get available models
-   */
-  async getModels(): Promise<ApiResponse<string[]>> {
-    return await this.llmGateway.getModels();
-  }
-}
-
 // Export singleton instances
 export const llmGateway = new LLMGateway();
-export const chatService = new ChatService();

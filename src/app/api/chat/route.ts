@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { MessageManager } from "@/modules/messages";
-import { chatService } from "@/modules/llm";
 import { withApiMiddleware, schemas, ApiUtils } from "@/modules/api";
 import { MessageRole } from "@/types";
 
@@ -19,13 +18,13 @@ export const POST = withApiMiddleware(
         threadId!,
         message,
         MessageRole.USER,
-        userId!,
+        userId!
       );
 
       if (!userMessageResult.success) {
         return ApiUtils.createErrorResponse(
           userMessageResult.error || "Failed to save user message",
-          400,
+          400
         );
       }
 
@@ -33,54 +32,34 @@ export const POST = withApiMiddleware(
       let ragResponse: string | null = null;
       try {
         const ragManager = await import("@/modules/rag").then((m) =>
-          m.createRAGManager(),
+          m.createRAGManager()
         );
         const result = await ragManager.generateResponse(message, threadId!);
         ragResponse = result.response;
       } catch (error) {
         console.warn(
           "RAG generation failed, falling back to regular chat:",
-          error,
+          error
         );
         ragResponse = null;
       }
 
-      // Use RAG response if available, otherwise fall back to regular chat
-      let finalResponse: string;
-
-      if (ragResponse) {
-        // Use RAG-generated response
-        finalResponse = ragResponse;
-      } else {
-        // Fall back to regular chat without context
-        const response = await chatService.processMessage(
-          [{ role: "user", content: message }],
-          [],
-          { model, temperature },
-        );
-
-        if (!response.success) {
-          return ApiUtils.createErrorResponse(
-            response.error || "Failed to process message",
-            500,
-          );
-        }
-
-        finalResponse = response.data!.content;
-      }
+      const finalResponse =
+        ragResponse ??
+        "I am sorry, I could not find any relevant information to answer your question.";
 
       // Save assistant message
       const assistantMessageResult = await MessageManager.addMessage(
         threadId!,
         finalResponse,
         MessageRole.ASSISTANT,
-        userId!,
+        userId!
       );
 
       if (!assistantMessageResult.success) {
         console.error(
           "Failed to save assistant message:",
-          assistantMessageResult.error,
+          assistantMessageResult.error
         );
       }
 
@@ -95,5 +74,5 @@ export const POST = withApiMiddleware(
       console.error("Chat API error:", error);
       return ApiUtils.createErrorResponse("Internal server error", 500);
     }
-  },
+  }
 );

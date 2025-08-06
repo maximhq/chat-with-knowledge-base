@@ -68,7 +68,7 @@ export class ApiUtils {
    */
   static createResponse<T>(
     data: ApiResponse<T>,
-    status: number = 200,
+    status: number = 200
   ): NextResponse {
     return NextResponse.json(data, { status });
   }
@@ -78,14 +78,14 @@ export class ApiUtils {
    */
   static createErrorResponse(
     error: string,
-    status: number = 400,
+    status: number = 400
   ): NextResponse {
     return NextResponse.json(
       {
         success: false,
         error,
       },
-      { status },
+      { status }
     );
   }
 
@@ -94,7 +94,7 @@ export class ApiUtils {
    */
   static validateRequest<T>(
     body: unknown,
-    schema: z.ZodSchema<T>,
+    schema: z.ZodSchema<T>
   ): { success: true; data: T } | { success: false; errors: string[] } {
     try {
       const data = schema.parse(body);
@@ -102,7 +102,7 @@ export class ApiUtils {
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errors = error.errors.map(
-          (err) => `${err.path.join(".")}: ${err.message}`,
+          (err) => `${err.path.join(".")}: ${err.message}`
         );
         return { success: false, errors };
       }
@@ -239,7 +239,7 @@ export class RateLimiter {
    */
   static checkRateLimit(
     clientId: string,
-    limit: { requests: number; windowMs: number },
+    limit: { requests: number; windowMs: number }
   ): { allowed: boolean; resetTime?: number; remaining?: number } {
     const now = Date.now();
     const key = `${clientId}:${Math.floor(now / limit.windowMs)}`;
@@ -305,7 +305,7 @@ export async function requireAuth(): Promise<ApiResponse<null> | null> {
 
 export function withRateLimit(
   limit: { requests: number; windowMs: number },
-  handler: (request: NextRequest) => Promise<NextResponse>,
+  handler: (request: NextRequest) => Promise<NextResponse>
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
     try {
@@ -330,7 +330,7 @@ export function withRateLimit(
               "X-RateLimit-Remaining": "0",
               "X-RateLimit-Reset": resetTime || "",
             },
-          },
+          }
         );
       }
 
@@ -340,7 +340,7 @@ export function withRateLimit(
       response.headers.set("X-RateLimit-Limit", limit.requests.toString());
       response.headers.set(
         "X-RateLimit-Remaining",
-        (rateCheck.remaining || 0).toString(),
+        (rateCheck.remaining || 0).toString()
       );
 
       return response;
@@ -353,7 +353,7 @@ export function withRateLimit(
 
 export function withValidation<T>(
   schema: z.ZodSchema<T>,
-  handler: (request: NextRequest, data: T) => Promise<NextResponse>,
+  handler: (request: NextRequest, data: T) => Promise<NextResponse>
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
     try {
@@ -363,7 +363,7 @@ export function withValidation<T>(
       if (!validation.success) {
         return ApiUtils.createErrorResponse(
           `Validation failed: ${validation.errors.join(", ")}`,
-          400,
+          400
         );
       }
 
@@ -384,8 +384,8 @@ export function withApiMiddleware<T>(
   },
   handler: (
     request: NextRequest,
-    context: { userId?: string; data?: T },
-  ) => Promise<NextResponse>,
+    context: { userId?: string; data?: T }
+  ) => Promise<NextResponse>
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
     try {
@@ -396,7 +396,7 @@ export function withApiMiddleware<T>(
         const clientIP = ApiUtils.getClientIP(request);
         const rateCheck = RateLimiter.checkRateLimit(
           clientIP,
-          options.rateLimit,
+          options.rateLimit
         );
 
         if (!rateCheck.allowed) {
@@ -421,7 +421,7 @@ export function withApiMiddleware<T>(
         if (!validation.success) {
           return ApiUtils.createErrorResponse(
             `Validation failed: ${validation.errors.join(", ")}`,
-            400,
+            400
           );
         }
         context.data = validation.data;
@@ -442,16 +442,11 @@ export async function healthCheck(): Promise<NextResponse> {
     const { DatabaseUtils } = await import("@/modules/storage");
     const dbHealth = await DatabaseUtils.healthCheck();
 
-    // Check LLM service
-    const { chatService } = await import("@/modules/llm");
-    const llmHealth = await chatService.healthCheck();
-
     const health = {
       status: "ok",
       timestamp: new Date().toISOString(),
       services: {
         database: dbHealth,
-        llm: llmHealth,
       },
     };
 
@@ -468,7 +463,7 @@ export async function healthCheck(): Promise<NextResponse> {
         timestamp: new Date().toISOString(),
         error: "Health check failed",
       },
-      { status: 503 },
+      { status: 503 }
     );
   }
 }
