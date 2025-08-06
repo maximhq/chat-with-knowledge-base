@@ -6,14 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Upload,
-  Link,
-  FileText,
-  Trash2,
-  ExternalLink,
-  Plus,
-} from "lucide-react";
+import { Upload, Link, FileText, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { FileUploadDropzone } from "./FileUploadDropzone";
 import { useThreadStore } from "@/stores";
@@ -26,19 +19,17 @@ type UploadResult = {
   chunksProcessed?: number;
   error?: string;
 };
-import type { Document, ExternalLink as ExternalLinkType } from "@/types";
+import type { Document } from "@/types";
 
 export function KnowledgeBaseInterface() {
   const [documents, setDocuments] = useState<Document[]>([]);
-  const [links, setLinks] = useState<ExternalLinkType[]>([]);
   const [newLinkUrl, setNewLinkUrl] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const selectedThreadId = useThreadStore((state) => state.selectedThreadId!);
 
   useEffect(() => {
     fetchDocuments();
-    fetchLinks();
-  }, [selectedThreadId]);
+  }, [selectedThreadId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchDocuments = async () => {
     try {
@@ -55,20 +46,6 @@ export function KnowledgeBaseInterface() {
       console.error("Error fetching documents:", error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const fetchLinks = async () => {
-    try {
-      const response = await fetch("/api/links");
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setLinks(data.data);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching links:", error);
     }
   };
 
@@ -113,18 +90,23 @@ export function KnowledgeBaseInterface() {
       const response = await fetch("/api/links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: newLinkUrl.trim() }),
+        body: JSON.stringify({
+          url: newLinkUrl.trim(),
+          threadId: selectedThreadId,
+        }),
       });
 
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setLinks((prev) => [data.data, ...prev]);
+          // Refresh both documents and links since they're now unified
+          await fetchDocuments();
           setNewLinkUrl("");
-          toast.success("Link added successfully");
+          toast.success("Link scraped and indexed successfully");
         }
       } else {
-        toast.error("Failed to add link");
+        const errorData = await response.json();
+        toast.error(errorData.error || "Failed to add link");
       }
     } catch (error) {
       console.error("Error adding link:", error);
@@ -150,24 +132,6 @@ export function KnowledgeBaseInterface() {
     }
   };
 
-  const handleDeleteLink = async (linkId: string) => {
-    try {
-      const response = await fetch(`/api/links/${linkId}`, {
-        method: "DELETE",
-      });
-
-      if (response.ok) {
-        setLinks((prev) => prev.filter((link) => link.id !== linkId));
-        toast.success("Link deleted successfully");
-      } else {
-        toast.error("Failed to delete link");
-      }
-    } catch (error) {
-      console.error("Error deleting link:", error);
-      toast.error("Error deleting link");
-    }
-  };
-
   const getFileIcon = (mimeType: string) => {
     switch (mimeType) {
       case "application/pdf":
@@ -179,6 +143,8 @@ export function KnowledgeBaseInterface() {
         return "📃";
       case "text/markdown":
         return "📋";
+      case "link":
+        return "🔗";
       default:
         return "📁";
     }
@@ -264,73 +230,6 @@ export function KnowledgeBaseInterface() {
                     </p>
                   </CardContent>
                 </Card>
-
-                {/* Documents List */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>
-                      Uploaded Documents ({documents.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {isLoading ? (
-                      <div className="flex items-center justify-center py-8">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
-                      </div>
-                    ) : documents.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No documents uploaded yet</p>
-                        <p className="text-sm mt-1">
-                          Upload your first document to get started
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {documents.map((document) => (
-                          <div
-                            key={document.id}
-                            className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                          >
-                            <div className="flex items-center space-x-3">
-                              <span className="text-2xl">
-                                {getFileIcon(document.mimeType)}
-                              </span>
-                              <div>
-                                <h3 className="font-medium text-gray-900 dark:text-white">
-                                  {document.originalName}
-                                </h3>
-                                <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
-                                  <span>{formatFileSize(document.size)}</span>
-                                  <span
-                                    className={`px-2 py-1 rounded-full text-xs ${getStatusColor(
-                                      document.status
-                                    )}`}
-                                  >
-                                    {document.status}
-                                  </span>
-                                  <span>
-                                    {new Date(
-                                      document.createdAt
-                                    ).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                            <Button
-                              onClick={() => handleDeleteDocument(document.id)}
-                              size="sm"
-                              variant="ghost"
-                              className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
               </TabsContent>
 
               <TabsContent
@@ -352,7 +251,7 @@ export function KnowledgeBaseInterface() {
                           placeholder="Enter URL (e.g., https://example.com)"
                           value={newLinkUrl}
                           onChange={(e) => setNewLinkUrl(e.target.value)}
-                          onKeyPress={(e) => {
+                          onKeyDown={(e) => {
                             if (e.key === "Enter") {
                               handleAddLink();
                             }
@@ -371,74 +270,76 @@ export function KnowledgeBaseInterface() {
                       </p>
                     </CardContent>
                   </Card>
-
-                  {/* Links List */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>External Links ({links.length})</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {links.length === 0 ? (
-                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                          <Link className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                          <p>No external links added yet</p>
-                          <p className="text-sm mt-1">
-                            Add your first link to expand your knowledge base
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {links.map((link) => (
-                            <div
-                              key={link.id}
-                              className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
-                            >
-                              <div className="flex items-center space-x-3 flex-1 min-w-0">
-                                <ExternalLink className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                  <h3 className="font-medium text-gray-900 dark:text-white truncate">
-                                    {link.title || link.url}
-                                  </h3>
-                                  <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                    {link.url}
-                                  </p>
-                                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                    Added{" "}
-                                    {new Date(
-                                      link.createdAt
-                                    ).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  onClick={() =>
-                                    window.open(link.url, "_blank")
-                                  }
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-blue-500 hover:text-blue-700"
-                                >
-                                  <ExternalLink className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  onClick={() => handleDeleteLink(link.id)}
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
                 </div>
               </TabsContent>
             </Tabs>
+
+            {/* Documents List */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Uploaded Documents ({documents.length})</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-400"></div>
+                  </div>
+                ) : documents.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No documents uploaded yet</p>
+                    <p className="text-sm mt-1">
+                      Upload your first document to get started
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {documents.map((document) => (
+                      <div
+                        key={document.id}
+                        className="flex items-center justify-between p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <span className="text-2xl">
+                            {getFileIcon(document.type)}
+                          </span>
+                          <div>
+                            <h3 className="font-medium text-gray-900 dark:text-white">
+                              {document.type === "link"
+                                ? document.title.replace(".txt", "")
+                                : document.title}
+                            </h3>
+                            <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                              <span>{formatFileSize(document.size)}</span>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs ${getStatusColor(
+                                  document.status
+                                )}`}
+                              >
+                                {document.status}
+                              </span>
+                              <span>
+                                {new Date(
+                                  document.createdAt
+                                ).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={() => handleDeleteDocument(document.id)}
+                          size="sm"
+                          variant="ghost"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </div>
       </ScrollArea>

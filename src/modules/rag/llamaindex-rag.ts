@@ -85,8 +85,9 @@ export class LlamaIndexRAGManager {
     fileMetadata: {
       name: string;
       size?: number;
-      mimeType?: string;
-    }[]
+      type?: string;
+    }[],
+    documentType: "file" | "link" = "file"
   ): Promise<IndexingResult> {
     try {
       console.log(
@@ -119,6 +120,13 @@ export class LlamaIndexRAGManager {
       // Create a lookup map for file metadata by filename
       const fileMetadataMap = new Map(
         updatedFileMetadata.map((meta) => [meta.filename, meta])
+      );
+
+      console.log(
+        ">>> fileMetadataMap",
+        Array.from(fileMetadataMap, ([, metadata]) =>
+          JSON.stringify(metadata, null, 2)
+        ).join(",\n")
       );
 
       // Add threadId metadata for filtering using filename-based lookup
@@ -169,10 +177,9 @@ export class LlamaIndexRAGManager {
           data: {
             id: fileMeta.documentId, // Use cuid2 ID as primary key
             threadId,
-            filename: fileMeta.filename,
-            originalName: fileMeta.name,
+            title: fileMeta.name, // Use filename/URL as title
+            type: documentType, // Use provided document type (file or link)
             size: fileMeta.size || 0,
-            mimeType: fileMeta.mimeType || "application/octet-stream",
             status: "READY",
           },
         });
@@ -339,7 +346,7 @@ export class LlamaIndexRAGManager {
       // First, find all document records to get the doc_ids
       const documents = await prisma.document.findMany({
         where: {
-          filename: filename,
+          title: filename, // filename parameter is actually the title now
           threadId: threadId,
         },
       });
@@ -393,6 +400,60 @@ export class LlamaIndexRAGManager {
     } catch (error) {
       console.error(
         `Failed to delete documents for filename ${filename} in thread ${threadId}:`,
+        error
+      );
+      return {
+        success: false,
+        deletedCount: 0,
+        message: `Failed to delete documents: ${error}`,
+      };
+    }
+  }
+
+  /**
+   * Delete all documents by threadId
+   */
+  async deleteDocumentsByThreadId(threadId: string): Promise<{
+    success: boolean;
+    deletedCount: number;
+    message: string;
+  }> {
+    try {
+      console.log(`Deleting documents for threadId: ${threadId}`);
+
+      // Delete from Qdrant vector store using metadata filter
+      try {
+        const client = this.vectorStore.client();
+        await client.delete(this.collectionName, {
+          filter: {
+            must: [
+              {
+                key: "threadId",
+                match: {
+                  value: threadId,
+                },
+              },
+            ],
+          },
+        });
+        console.log(
+          `Successfully deleted vector embeddings for threadId: ${threadId}`
+        );
+      } catch (vectorError) {
+        console.warn(
+          `Failed to delete from vector store for threadId: ${threadId}:`,
+          vectorError
+        );
+      }
+
+      return {
+        success: true,
+        deletedCount: 0,
+        message: `Successfully deleted documents for threadId: ${threadId}`,
+      };
+    } catch (error) {
+      console.error(
+        `Failed to delete documents for threadId ${threadId}:`,
         error
       );
       return {

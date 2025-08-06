@@ -2,6 +2,7 @@
 import { NextRequest } from "next/server";
 import { ThreadManager } from "@/modules/threads";
 import { withApiMiddleware, schemas, ApiUtils } from "@/modules/api";
+import { createRAGManager } from "@/modules/rag";
 
 // GET /api/threads/[id] - Get specific thread
 export const GET = withApiMiddleware(
@@ -16,7 +17,7 @@ export const GET = withApiMiddleware(
 
     const result = await ThreadManager.getThread(threadId, userId!);
     return ApiUtils.createResponse(result, result.success ? 200 : 404);
-  },
+  }
 );
 
 // PUT /api/threads/[id] - Update thread
@@ -36,10 +37,10 @@ export const PUT = withApiMiddleware(
     const result = await ThreadManager.updateThreadTitle(
       threadId,
       userId!,
-      data!.title,
+      data!.title
     );
     return ApiUtils.createResponse(result);
-  },
+  }
 );
 
 // DELETE /api/threads/[id] - Delete thread
@@ -54,6 +55,9 @@ export const DELETE = withApiMiddleware(
     }
 
     const result = await ThreadManager.deleteThread(threadId, userId!);
+
+    const ragManager = await createRAGManager();
+    await ragManager.deleteDocumentsByThreadId(threadId);
     return ApiUtils.createResponse(result);
-  },
+  }
 );

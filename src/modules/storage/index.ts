@@ -5,8 +5,7 @@ import type {
   Thread,
   Message,
   Document,
-  ExternalLink,
-  FileStatus,
+  DocumentStatus,
 } from "@/types";
 
 // Singleton Prisma client
@@ -168,21 +167,21 @@ export class DocumentStorage {
   }
 
   static async create(data: {
-    filename: string;
-    originalName: string;
-    mimeType: string;
+    title: string;
+    type: string;
     size: number;
-    path: string;
-    status: FileStatus;
     threadId: string;
-    chunkCount?: number;
+    status?: DocumentStatus;
   }): Promise<Document> {
     return await prisma.document.create({
-      data,
+      data: {
+        ...data,
+        status: data.status || "PROCESSING",
+      },
     });
   }
 
-  static async updateStatus(id: string, status: FileStatus): Promise<Document> {
+  static async updateStatus(id: string, status: DocumentStatus): Promise<Document> {
     return await prisma.document.update({
       where: { id },
       data: { status },
@@ -198,40 +197,7 @@ export class DocumentStorage {
 
 // Note: DocumentChunk operations removed - embeddings now stored only in Qdrant
 // Document metadata and chunk counts are tracked in the Document table
-
-// External link operations
-export class ExternalLinkStorage {
-  static async findByUserId(userId: string): Promise<ExternalLink[]> {
-    return await prisma.externalLink.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  static async create(
-    data: Omit<ExternalLink, "id" | "createdAt" | "updatedAt">,
-  ): Promise<ExternalLink> {
-    return await prisma.externalLink.create({
-      data,
-    });
-  }
-
-  static async update(
-    id: string,
-    data: Partial<ExternalLink>,
-  ): Promise<ExternalLink> {
-    return await prisma.externalLink.update({
-      where: { id },
-      data,
-    });
-  }
-
-  static async delete(id: string): Promise<void> {
-    await prisma.externalLink.delete({
-      where: { id },
-    });
-  }
-}
+// External links are now stored as documents with type="link"
 
 // Database utilities
 export class DatabaseUtils {

@@ -78,18 +78,16 @@ enum MessageRole {
   SYSTEM
 }
 
-// File Upload Module
+// File/Link Upload Module
 model Document {
-  id           String     @id @default(cuid())
-  filename     String
-  originalName String
-  mimeType     String
-  size         Int
-  threadId     String // Required - every document belongs to a thread
-  status       FileStatus @default(PROCESSING)
-  chunkCount   Int        @default(0)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id        String         @id @default(cuid())
+  title     String
+  type      String
+  size      Int
+  threadId  String
+  status    DocumentStatus @default(PROCESSING)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   thread Thread @relation(fields: [threadId], references: [id], onDelete: Cascade)
 
@@ -97,22 +95,12 @@ model Document {
   @@index([threadId, createdAt])
 }
 
-enum FileStatus {
+enum DocumentStatus {
   PROCESSING
   READY
   ERROR
-}
 
-model ExternalLink {
-  id        String   @id @default(cuid())
-  url       String
-  title     String?
-  content   String?  @db.Text
-  userId    String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId, createdAt])
+  @@map("DocumentStatus")
 }
 
 // API Key Management

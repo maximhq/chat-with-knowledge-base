@@ -31,7 +31,7 @@ export const POST = withApiMiddleware(
       if (!thread || thread.userId !== userId) {
         return ApiUtils.createErrorResponse(
           "Thread not found or access denied",
-          403,
+          403
         );
       }
 
@@ -56,7 +56,7 @@ export const POST = withApiMiddleware(
       if (file.size > maxSize) {
         return ApiUtils.createErrorResponse(
           "File too large. Maximum size is 10MB",
-          400,
+          400
         );
       }
 
@@ -85,9 +85,9 @@ export const POST = withApiMiddleware(
           {
             name: file.name,
             size: file.size,
-            mimeType: file.type,
+            type: file.type,
           },
-        ],
+        ]
       );
 
       // Clean up temporary directory and all files
@@ -99,7 +99,7 @@ export const POST = withApiMiddleware(
       } catch (cleanupError) {
         console.warn(
           `Failed to clean up temporary directory: ${tempDirectoryPath}`,
-          cleanupError,
+          cleanupError
         );
       }
 
@@ -133,17 +133,17 @@ export const POST = withApiMiddleware(
           }
           await rmdir(tempDirectoryPath);
           console.log(
-            `Cleaned up temporary directory after error: ${tempDirectoryPath}`,
+            `Cleaned up temporary directory after error: ${tempDirectoryPath}`
           );
         } catch (cleanupError) {
           console.warn(
             `Failed to clean up temporary directory: ${tempDirectoryPath}`,
-            cleanupError,
+            cleanupError
           );
         }
       }
 
       return ApiUtils.createErrorResponse("Internal server error", 500);
     }
-  },
+  }
 );

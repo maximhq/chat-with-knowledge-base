@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { Sidebar } from "./Sidebar";
 import { Workspace } from "./Workspace";
@@ -32,12 +32,63 @@ export function MainLayout({ threadId }: MainLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Handle URL-based thread selection
+  // Thread validation state
+  const [isValidatingThread, setIsValidatingThread] = useState(false);
+
+  // Validate thread exists in database
   useEffect(() => {
-    if (threadId && threadId !== selectedThreadId) {
-      selectThread(threadId);
-      setActiveTab("messages");
-    } else if (!threadId && selectedThreadId && pathname === "/") {
+    const validateThread = async () => {
+      if (!threadId || !session?.user) {
+        setIsValidatingThread(false);
+        return;
+      }
+
+      setIsValidatingThread(true);
+
+      try {
+        const response = await fetch(`/api/threads/${threadId}`);
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success) {
+            // Thread is valid, proceed with selection
+            if (threadId !== selectedThreadId) {
+              selectThread(threadId);
+              setActiveTab("messages");
+            }
+            setIsValidatingThread(false);
+          } else {
+            // Thread not found or access denied, redirect to home
+            console.log("Thread validation failed:", data.error);
+            router.push("/");
+          }
+        } else {
+          // Any error status (404, 403, etc.), redirect to home
+          console.log(
+            `Thread validation failed with status ${response.status}`
+          );
+          router.push("/");
+        }
+      } catch (error) {
+        console.error("Thread validation error:", error);
+        // Network error, redirect to home
+        router.push("/");
+      }
+    };
+
+    validateThread();
+  }, [
+    threadId,
+    session?.user,
+    selectedThreadId,
+    selectThread,
+    setActiveTab,
+    router,
+  ]);
+
+  // Handle URL-based thread selection for home page
+  useEffect(() => {
+    if (!threadId && selectedThreadId && pathname === "/") {
       // URL has no threadId but store has a selected thread
       // Check if the selected thread still exists before redirecting
       const threads = useThreadStore.getState().threads;
@@ -49,14 +100,7 @@ export function MainLayout({ threadId }: MainLayoutProps) {
         selectThread(null);
       }
     }
-  }, [
-    threadId,
-    selectedThreadId,
-    selectThread,
-    setActiveTab,
-    router,
-    pathname,
-  ]);
+  }, [threadId, selectedThreadId, pathname, router, selectThread]);
 
   // Handle thread selection with URL navigation
   const handleThreadSelect = (newThreadId: string | null) => {
@@ -71,7 +115,7 @@ export function MainLayout({ threadId }: MainLayoutProps) {
     }
   };
 
-  if (status === "loading") {
+  if (status === "loading" || isValidatingThread) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>

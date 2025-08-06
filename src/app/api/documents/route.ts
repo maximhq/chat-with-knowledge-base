@@ -38,15 +38,13 @@ export const GET = withApiMiddleware(
 
       const transformedDocuments = documents.map((doc) => ({
         id: doc.id,
-        filename: doc.filename,
-        originalName: doc.originalName,
-        mimeType: doc.mimeType,
+        title: doc.title,
+        type: doc.type,
         size: doc.size,
-        chunksCount: doc.chunkCount,
         threadId: doc.threadId,
         threadTitle: doc.thread?.title,
         createdAt: doc.createdAt.toISOString(),
-        status: doc.status.toLowerCase(),
+        status: doc.status,
       }));
 
       return ApiUtils.createResponse({

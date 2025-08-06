@@ -1,6 +1,6 @@
 // Core application types for modular architecture
 
-import { MessageRole, FileStatus } from "@prisma/client";
+import { MessageRole, DocumentStatus } from "@prisma/client";
 
 export interface User {
   id: string;
@@ -30,17 +30,15 @@ export interface Message {
 }
 
 // Export Prisma types for use in other modules
-export { MessageRole, FileStatus };
+export { MessageRole, DocumentStatus };
 
 export interface Document {
   id: string;
-  filename: string;
-  originalName: string;
-  mimeType: string;
+  title: string;
+  type: string;
   size: number;
   threadId: string;
-  status: FileStatus;
-  chunkCount: number;
+  status: DocumentStatus;
   createdAt: Date;
   updatedAt: Date;
   thread?: {
@@ -57,16 +55,6 @@ export interface DocumentChunk {
   embedding: string; // JSON string of vector embeddings
   chunkIndex: number;
   createdAt: Date;
-}
-
-export interface ExternalLink {
-  id: string;
-  url: string;
-  title: string | null;
-  content: string | null;
-  userId: string;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 // API Response types

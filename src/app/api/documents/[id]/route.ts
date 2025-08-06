@@ -29,7 +29,7 @@ export const DELETE = withApiMiddleware(
       // Delete from both MySQL and Qdrant using RAG manager
       const ragManager = await createRAGManager();
       const deletionResult = await ragManager.deleteDocumentsByFilename(
-        document.filename,
+        document.title,
         document.threadId,
       );
 
