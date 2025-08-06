@@ -33,10 +33,6 @@ export class LLMGateway {
       apiKey: this.config.apiKey,
       timeout: this.config.timeout,
     });
-    // this.openai = new OpenAI({
-    //   apiKey: process.env.OPENAI_API_KEY,
-    //   timeout: this.config.timeout,
-    // });
   }
 
   /**
