@@ -34,10 +34,6 @@ export function Sidebar({ selectedThreadId, onThreadSelect }: SidebarProps) {
   const handleDeleteThread = async (threadId: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (!confirm("Are you sure you want to delete this thread?")) {
-      return;
-    }
-
     // Check if we're deleting the currently selected thread
     const isDeletingSelectedThread = selectedThreadId === threadId;
 

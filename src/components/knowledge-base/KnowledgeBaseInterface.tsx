@@ -43,7 +43,7 @@ export function KnowledgeBaseInterface() {
   const fetchDocuments = async () => {
     try {
       const response = await fetch(
-        "/api/documents?threadId=" + selectedThreadId,
+        "/api/documents?threadId=" + selectedThreadId
       );
       if (response.ok) {
         const data = await response.json();
@@ -85,12 +85,12 @@ export function KnowledgeBaseInterface() {
     const successfulUploads = results.filter((result) => result.success);
     if (successfulUploads.length > 0) {
       console.log(
-        `${successfulUploads.length} files uploaded successfully, refreshing documents list`,
+        `${successfulUploads.length} files uploaded successfully, refreshing documents list`
       );
       toast.success(
         `${successfulUploads.length} document${
           successfulUploads.length > 1 ? "s" : ""
-        } uploaded and indexed successfully!`,
+        } uploaded and indexed successfully!`
       );
       await fetchDocuments();
     }
@@ -101,7 +101,7 @@ export function KnowledgeBaseInterface() {
       toast.error(
         `${failedUploads.length} document${
           failedUploads.length > 1 ? "s" : ""
-        } failed to upload. Use the retry button to try again.`,
+        } failed to upload. Use the retry button to try again.`
       );
     }
   };
@@ -133,8 +133,6 @@ export function KnowledgeBaseInterface() {
   };
 
   const handleDeleteDocument = async (documentId: string) => {
-    if (!confirm("Are you sure you want to delete this document?")) return;
-
     try {
       const response = await fetch(`/api/documents/${documentId}`, {
         method: "DELETE",
@@ -153,8 +151,6 @@ export function KnowledgeBaseInterface() {
   };
 
   const handleDeleteLink = async (linkId: string) => {
-    if (!confirm("Are you sure you want to delete this link?")) return;
-
     try {
       const response = await fetch(`/api/links/${linkId}`, {
         method: "DELETE",
@@ -261,7 +257,6 @@ export function KnowledgeBaseInterface() {
                     <FileUploadDropzone
                       onFilesSelected={handleFileUpload}
                       onUploadComplete={handleUploadComplete}
-                      autoIndex={true}
                     />
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                       Supported formats: PDF, DOCX, DOC, TXT, MD (Max 10MB per
@@ -309,14 +304,14 @@ export function KnowledgeBaseInterface() {
                                   <span>{formatFileSize(document.size)}</span>
                                   <span
                                     className={`px-2 py-1 rounded-full text-xs ${getStatusColor(
-                                      document.status,
+                                      document.status
                                     )}`}
                                   >
                                     {document.status}
                                   </span>
                                   <span>
                                     {new Date(
-                                      document.createdAt,
+                                      document.createdAt
                                     ).toLocaleDateString()}
                                   </span>
                                 </div>
@@ -410,7 +405,7 @@ export function KnowledgeBaseInterface() {
                                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                     Added{" "}
                                     {new Date(
-                                      link.createdAt,
+                                      link.createdAt
                                     ).toLocaleDateString()}
                                   </p>
                                 </div>

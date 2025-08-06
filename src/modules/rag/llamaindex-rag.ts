@@ -86,11 +86,11 @@ export class LlamaIndexRAGManager {
       name: string;
       size?: number;
       mimeType?: string;
-    }[],
+    }[]
   ): Promise<IndexingResult> {
     try {
       console.log(
-        `Indexing documents from directory ${directoryPath} for thread ${threadId}`,
+        `Indexing documents from directory ${directoryPath} for thread ${threadId}`
       );
 
       // Load documents from directory using SimpleDirectoryReader
@@ -112,19 +112,40 @@ export class LlamaIndexRAGManager {
       // Create updated file metadata with generated document IDs
       const updatedFileMetadata = fileMetadata.map((fileMeta, index) => ({
         ...fileMeta,
-        docId: createId(), // Generate secure, unique ID using cuid2
+        documentId: createId(), // Generate secure, unique ID using cuid2
         filename: fileMeta.name || `document_${index}`,
       }));
 
-      // Add threadId metadata for filtering using the updated metadata
-      documents.forEach((doc, index) => {
-        const { docId, filename } = updatedFileMetadata[index];
+      // Create a lookup map for file metadata by filename
+      const fileMetadataMap = new Map(
+        updatedFileMetadata.map((meta) => [meta.filename, meta])
+      );
+
+      // Add threadId metadata for filtering using filename-based lookup
+      documents.forEach((doc) => {
+        // Extract filename from document metadata (could be file_name or fileName)
+        const docFilename = doc.metadata?.file_name || doc.metadata?.fileName;
+
+        if (!docFilename) {
+          console.warn("Document missing filename in metadata:", doc.metadata);
+          return;
+        }
+
+        // Find matching file metadata by filename
+        const fileMetadata = fileMetadataMap.get(docFilename);
+
+        if (!fileMetadata) {
+          console.warn(
+            `No file metadata found for document filename: ${docFilename}`
+          );
+          return;
+        }
 
         doc.metadata = {
           ...doc.metadata,
           threadId,
-          doc_id: docId,
-          fileName: filename,
+          documentId: fileMetadata.documentId,
+          fileName: fileMetadata.filename,
           uploadedAt: new Date().toISOString(),
         };
       });
@@ -146,7 +167,7 @@ export class LlamaIndexRAGManager {
       for (const fileMeta of updatedFileMetadata) {
         const docRecord = await prisma.document.create({
           data: {
-            id: fileMeta.docId, // Use cuid2 ID as primary key
+            id: fileMeta.documentId, // Use cuid2 ID as primary key
             threadId,
             filename: fileMeta.filename,
             originalName: fileMeta.name,
@@ -159,7 +180,7 @@ export class LlamaIndexRAGManager {
       }
 
       console.log(
-        `Created ${documentRecords.length} document records in MySQL`,
+        `Created ${documentRecords.length} document records in MySQL`
       );
 
       return {
@@ -183,15 +204,15 @@ export class LlamaIndexRAGManager {
    */
   async generateResponse(
     query: string,
-    threadId: string,
+    threadId: string
   ): Promise<GenerateResult> {
     try {
       const vectorStoreIndex = await VectorStoreIndex.fromVectorStore(
-        this.vectorStore,
+        this.vectorStore
       );
 
       console.log(
-        `Generating response for query: "${query.substring(0, 100)}..."`,
+        `Generating response for query: "${query.substring(0, 100)}..."`
       );
 
       // Create retriever with threadId filter for context retrieval only
@@ -215,7 +236,7 @@ export class LlamaIndexRAGManager {
       const contextText = retrievedNodes
         .map(
           (node: NodeWithScore, index: number) =>
-            `[${index + 1}] ${node.node.getContent(MetadataMode.NONE)}`,
+            `[${index + 1}] ${node.node.getContent(MetadataMode.NONE)}`
         )
         .join("\n\n");
 
@@ -261,12 +282,50 @@ export class LlamaIndexRAGManager {
     }
   }
 
+  async getAllDocumentsById(docId: string, threadId: string) {
+    try {
+      const client = this.vectorStore.client();
+      const searchResult = await client.scroll(this.collectionName, {
+        filter: {
+          must: [
+            {
+              key: "threadId",
+              match: {
+                value: threadId,
+              },
+            },
+            {
+              key: "documentId",
+              match: {
+                value: docId,
+              },
+            },
+          ],
+        },
+      });
+
+      return searchResult.points.map((point) => {
+        return {
+          id: point.id,
+          payload: point.payload,
+          shard_key: point.shard_key,
+          order_value: point.order_value,
+        };
+      });
+    } catch (vectorError) {
+      console.warn(
+        `Failed to get documents from vector store for ${docId}:`,
+        vectorError
+      );
+    }
+  }
+
   /**
    * Delete documents by filename (simplified - removes from Qdrant and MySQL)
    */
   async deleteDocumentsByFilename(
     filename: string,
-    threadId: string,
+    threadId: string
   ): Promise<{
     success: boolean;
     deletedCount: number;
@@ -274,7 +333,7 @@ export class LlamaIndexRAGManager {
   }> {
     try {
       console.log(
-        `Deleting documents for filename: ${filename} in thread: ${threadId}`,
+        `Deleting documents for filename: ${filename} in thread: ${threadId}`
       );
 
       // First, find all document records to get the doc_ids
@@ -317,12 +376,12 @@ export class LlamaIndexRAGManager {
           },
         });
         console.log(
-          `Successfully deleted vector embeddings for ${filename} in thread ${threadId}`,
+          `Successfully deleted vector embeddings for ${filename} in thread ${threadId}`
         );
       } catch (vectorError) {
         console.warn(
           `Failed to delete from vector store for ${filename}:`,
-          vectorError,
+          vectorError
         );
       }
 
@@ -334,7 +393,7 @@ export class LlamaIndexRAGManager {
     } catch (error) {
       console.error(
         `Failed to delete documents for filename ${filename} in thread ${threadId}:`,
-        error,
+        error
       );
       return {
         success: false,
