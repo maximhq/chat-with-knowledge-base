@@ -82,7 +82,6 @@ services:
       - DATABASE_URL=mysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE}
 
       # Auth.js
-      # - AUTH_URL=${AUTH_URL}
       - AUTH_SECRET=${AUTH_SECRET}
 
       # Email (configure with your SMTP settings)

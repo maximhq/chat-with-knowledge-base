@@ -69,7 +69,6 @@ MAXIM_LOG_REPO_ID="your-maxim-log-repo-id"
 
 # 🟡 ENVIRONMENT-SPECIFIC
 DATABASE_URL="mysql://chatuser:${MYSQL_PASSWORD}@localhost:3306/chat_kb"
-NEXTAUTH_URL="http://localhost:3001"
 EMAIL_FROM="your-email@yourdomain.com"
 ALLOWED_EMAIL_DOMAINS="yourdomain.com,gmail.com"
 
@@ -126,34 +125,7 @@ docker-compose down
 
 ## 🚀 Production Deployment
 
-### Fly.io Deployment
-
-For secure production deployment with proper secrets management:
-
-```bash
-# Install Fly.io CLI
-brew install flyctl  # macOS
-# Or download from: https://fly.io/docs/hands-on/install-flyctl/
-
-# Login and create app
-fly auth login
-fly apps create your-unique-app-name
-
-# Set up all secrets interactively
-./fly-secrets-setup.sh
-
-# Deploy to production
-fly deploy
-```
-
-**📖 For detailed deployment instructions, database setup, and troubleshooting, see [DEPLOYMENT.md](./DEPLOYMENT.md)**
-
-### Security Features
-
-- 🔐 **Zero Hardcoded Secrets**: All sensitive data externalized to environment variables
-- 🛡️ **Fly.io Secrets**: Production secrets managed securely through Fly.io
-- 🔒 **Environment Isolation**: Separate configuration for development and production
-- ✅ **Security Checklist**: Comprehensive validation for secure deployment
+TBD
 
 ## 📝 Available Scripts
 

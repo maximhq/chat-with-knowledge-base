@@ -11,7 +11,7 @@ export const POST = withApiMiddleware(
   },
   async (request: NextRequest, { userId, data }) => {
     try {
-      const { message, threadId, model, temperature } = data!;
+      const { message, threadId } = data!;
 
       // Add user message to thread
       const userMessageResult = await MessageManager.addMessage(
