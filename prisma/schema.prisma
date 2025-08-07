@@ -42,6 +42,7 @@ model User {
   accounts Account[]
   threads  Thread[]
   apiKeys  ApiKey[]
+  sessions Session[]
 }
 
 // Thread Management Module
@@ -120,4 +121,23 @@ model ApiKey {
   @@index([userId, isActive])
   @@index([keyHash])
   @@index([keyPrefix])
+}
+
+// NextAuth.js required models for session and verification tokens
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }

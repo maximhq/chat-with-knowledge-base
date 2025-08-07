@@ -21,15 +21,29 @@ const EmailOtpProvider = Email({
     console.log(">>> EMAIL OTP: ", otp);
     return otp;
   },
-  sendVerificationRequest: async (req) => {
-    // no-op
+  sendVerificationRequest: async (params: {
+    identifier: string;
+    url: string;
+    expires: Date;
+    token: string;
+    request: Request;
+  }) => {
+    try {
+      const mailer = await import("@/modules/email").then((m) =>
+        m.createEmailSender()
+      );
+      await mailer.sendVerificationEmail(params.identifier, params.token);
+    } catch (error) {
+      console.error("Error sending verification email:", error);
+    }
   },
 });
 
 // NextAuth.js v5 configuration
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-development-only",
-  trustHost: true, // Trust all hosts for Docker deployment
+  debug: true,
+  secret: process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   adapter: PrismaAdapter(prisma),
   providers: [EmailOtpProvider],
   pages: {
@@ -68,7 +82,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       console.log(
         "User signed in:",
         user.email,
-        isNewUser ? "(new user)" : "(existing user)",
+        isNewUser ? "(new user)" : "(existing user)"
       );
     },
   },
@@ -114,8 +128,8 @@ export function withAuth<T extends Record<string, unknown>>(
   handler: (
     req: NextRequest,
     res: NextResponse,
-    session: Session | null,
-  ) => Promise<T>,
+    session: Session | null
+  ) => Promise<T>
 ) {
   return async (req: NextRequest, res: NextResponse) => {
     try {
@@ -127,7 +141,7 @@ export function withAuth<T extends Record<string, unknown>>(
             success: false,
             error: "Authentication required",
           },
-          { status: 401 },
+          { status: 401 }
         );
       }
 
@@ -139,7 +153,7 @@ export function withAuth<T extends Record<string, unknown>>(
           success: false,
           error: "Internal server error",
         },
-        { status: 500 },
+        { status: 500 }
       );
     }
   };
