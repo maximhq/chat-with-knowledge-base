@@ -5,7 +5,4 @@ export type {
   GenerateResult,
 } from "./llamaindex-rag";
 
-export {
-  LlamaIndexRAGManager as RAGManager,
-  createLlamaIndexRAGManager as createRAGManager,
-} from "./llamaindex-rag";
+export { createLlamaIndexRAGManager as createRAGManager } from "./llamaindex-rag";

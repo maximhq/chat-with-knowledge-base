@@ -3,7 +3,6 @@ import { writeFile, mkdir, unlink, rmdir, readdir } from "fs/promises";
 import { join } from "path";
 import { v4 as uuidv4 } from "uuid";
 import { ThreadStorage } from "@/modules/storage";
-import { createRAGManager } from "@/modules/rag";
 import { withApiMiddleware, ApiUtils } from "@/modules/api";
 
 export const POST = withApiMiddleware(
@@ -77,7 +76,9 @@ export const POST = withApiMiddleware(
       console.log(`File saved in directory: ${tempFilePath}`);
 
       // Index documents from directory using RAG manager
-      const ragManager = await createRAGManager();
+      const ragManager = await import("@/modules/rag").then((m) =>
+        m.createRAGManager()
+      );
       const indexingResult = await ragManager.indexDocumentsFromDirectory(
         tempDirectoryPath,
         threadId,

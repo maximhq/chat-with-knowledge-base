@@ -2,7 +2,6 @@
 import { NextRequest } from "next/server";
 import { DocumentStorage } from "@/modules/storage";
 import { withApiMiddleware, ApiUtils } from "@/modules/api";
-import { createRAGManager } from "@/modules/rag";
 
 // DELETE /api/documents/[id] - Delete document from both MySQL and Qdrant
 export const DELETE = withApiMiddleware(
@@ -27,16 +26,18 @@ export const DELETE = withApiMiddleware(
       }
 
       // Delete from both MySQL and Qdrant using RAG manager
-      const ragManager = await createRAGManager();
+      const ragManager = await import("@/modules/rag").then((m) =>
+        m.createRAGManager()
+      );
       const deletionResult = await ragManager.deleteDocumentsByFilename(
         document.title,
-        document.threadId,
+        document.threadId
       );
 
       if (!deletionResult.success) {
         console.error(
           "Failed to delete from vector store:",
-          deletionResult.message,
+          deletionResult.message
         );
         // Continue with MySQL deletion even if vector store deletion fails
       }
@@ -56,5 +57,5 @@ export const DELETE = withApiMiddleware(
       console.error("Error deleting document:", error);
       return ApiUtils.createErrorResponse("Failed to delete document", 500);
     }
-  },
+  }
 );
