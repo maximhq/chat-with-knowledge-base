@@ -83,6 +83,7 @@ services:
 
       # Auth.js
       - AUTH_SECRET=${AUTH_SECRET}
+      - AUTH_URL=${AUTH_URL}
 
       # Email (configure with your SMTP settings)
       - RESEND_API_KEY=${RESEND_API_KEY}
